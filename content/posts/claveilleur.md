@@ -7,7 +7,7 @@ description = "The extremely simple macOS input source switching daemon behind t
 tags = ["macOS", "Swift", "keyboard"]
 +++
 
-> Now playing: Bad Apple!!
+> Now playing: [Bad Apple!!](https://www.youtube.com/watch?v=FtutLA63Cp8)
 
 ## The Problem
 
@@ -53,7 +53,7 @@ I haven't used Xcode that much,
 and I'm just a bit reluctant to leave my polyglot-friendly VSCode...
 
 On the other hand, the lure of Swift does seem irresistible this time
-(despite the fact that I'm more at ease with Rust):
+(despite the fact that I'm still new to Swift and more at ease with Rust):
 it has nearly seamless Objective-C interoperability support
 and some exclusive high-level macOS API bindings.
 
@@ -63,7 +63,7 @@ Combined with the [`SwiftPM`](https://www.swift.org/package-manager) CLI
 to build the project in the terminal,
 this does seem to provide the level of VSCode support that
 I would expect from a popular programming language.
-Thus, `Claveilleur` is developed entirely without launching Xcode. [^2]
+Thus, `Claveilleur` was made entirely without launching Xcode. [^2]
 
 ## The Solution
 
@@ -73,7 +73,65 @@ and [`yabai`](https://github.com/koekeishiya/yabai).
 All you need to do as a regular user is to download the all-in-one binary,
 use its CLI to tell `launchd` that you have a new daemon, and then it's done!
 
-TODO
+### Detecting Input Source Changes
+
+It should be clear by now that the core of `Claveilleur` relies on
+observing certain macOS desktop events such as the change of current input source and frontmost app,
+so the FRP (Functional Reactive Programming) paradigm should be a good fit.
+Introduced on WWDC 2019,
+Apple's [`Combine Framework`](https://developer.apple.com/documentation/combine)
+seems to play the exact role here.
+
+Let's start by implementing the observer for current input source changes, shall we?
+
+```swift
+let currentInputSourceObserver = DistributedNotificationCenter
+  .default
+  .publisher(for: kTISNotifySelectedKeyboardInputSourceChanged as Notification.Name)
+  .map { _ in getInputSource() }
+  .removeDuplicates()
+  .sink { inputSource in
+    guard let currentApp = getCurrentAppBundleID() else {
+      log.warning("currentInputSourceObserver: failed to get current app bundle ID for notification")
+      return
+    }
+    log.debug(
+      "currentInputSourceObserver: updating input source for `\(currentApp)` to: \(inputSource)"
+    )
+    saveInputSource(inputSource, forApp: currentApp)
+  }
+```
+
+This snippet perfectly demonstrates the aforementioned Swift-exclusive "high-level macOS API bindings".
+In fact, when writing down this snippet,
+I had the same pleasant feeling that I would have when chaining method calls in Rust.
+
+The code is as readable as it gets if you are familiar with Functional Programming in general:
+
+- `.publisher()`: We are processing the stream of input source change events.
+  Whenever this happens, a `kTISNotifySelectedKeyboardInputSourceChanged` message will be
+  posted in `DistributedNotificationCenter.default`.
+- `.map()`: Whenever a message arrives, we immediately get the current (new) input method.
+- `.removeDuplicates()`: We also need to ensure that the user is indeed switching to a different input method.
+- `.sink()`: We get the current (frontmost) app, and associate it with the current input method.
+  Later, when the current app changes, we can then use this information to restore the input method
+  to that associated value.
+
+Yes, it's just **that** simple.
+
+TODO: The difficult part was knowing what stream to observe...
+
+TODO: Implementation of `getCurrentAppBundleID`
+
+### Detecting Current App Changes
+
+### Registering a `launchd` Daemon
+
+### Getting Accessibility Privileges
+
+### Distribution via GoReleaser
+
+### Code Signing & Making a Single-Binary Bundle
 
 [^1]:
 However, turning on this feature on Windows will lead to another issue

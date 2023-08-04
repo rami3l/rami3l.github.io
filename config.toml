@@ -23,7 +23,7 @@ highlight_theme = "ayu-light"
 
 [extra]
 # control dark mode: auto | dark | toggle
-mode = "toggle"
+mode = "light"
 favicon = "/icon/favicon.png"
 copyright = "rami3l"
 
