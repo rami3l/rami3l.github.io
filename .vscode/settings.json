@@ -1,4 +1,7 @@
 {
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+  },
   "files.associations": {
     "*.html": "jinja-html"
   }
