@@ -30,7 +30,7 @@ copyright = "rami3l"
 useCDN = true
 
 [[extra.translations.en]]
-show_more = ">>>"
+show_more = ""
 previous_page = "< Previous"
 next_page = "Next >"
 posted_on = "on "
