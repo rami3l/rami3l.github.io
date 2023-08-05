@@ -7,19 +7,15 @@ description = "My scratchpad."
 
 theme = "archie-zola"
 
-# Whether to automatically compile all Sass files in the sass directory
 compile_sass = true
-
-# Whether to build a search index to be used later on by a JavaScript library
 build_search_index = false
 
 taxonomies = [{ name = "tags" }]
-
 default_language = "en"
 
 [markdown]
 highlight_code = true
-highlight_theme = "ayu-light"
+highlight_theme = "one-dark"
 
 [extra]
 # control dark mode: auto | dark | toggle
@@ -27,7 +23,7 @@ mode = "light"
 favicon = "/icon/favicon.png"
 copyright = "rami3l"
 
-useCDN = true
+useCDN = false
 
 [[extra.translations.en]]
 show_more = ""

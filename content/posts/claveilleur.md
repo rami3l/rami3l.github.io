@@ -183,7 +183,24 @@ this is because floating windows (such as those of Spotlight and Alfred) are som
 
 ... but there has to be another way, right?
 
-TODO: Introduce the Accessibility dance
+Yes! Right in that question thread,
+[Ryan H](https://stackoverflow.com/users/2246381/ryan-h) has proposed
+what could very likely be the way forward:
+
+> [...] get pids for all the apps you want,
+> and use `AXObserver` and `AXObserverAddNotification` to get notifications on them.
+
+The `AX` prefix here seems to stand for
+[Carbon Accessibility](https://developer.apple.com/documentation/applicationservices/carbon_accessibility).
+This makes perfect sense, since the aforementioned proprietary apps also need
+accessibility privileges to run in the first place!
+
+Unfortunately, using `AXObserver*` APIs in this case has two main difficulties:
+
+- Those APIs are old C-style ones, which require another kind of dance to call,
+ completely different from what we have seen previously.
+- Those APIs are called on a per-PID basis, which means I have to maintain a list of PIDs,
+  each associated with an individual observer.
 
 ### Registering a `launchd` Daemon
 
