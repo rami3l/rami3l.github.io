@@ -156,9 +156,10 @@ The code is as readable as it gets if you are familiar with FRP:
 
 Yes, it's just **that** simple... Or is it?
 
-How should I implement `getCurrentAppBundleID` then?
-
 ### Detecting Current App Changes
+
+The previous snippet assumes that `getCurrentAppBundleID` is correctly implemented,
+but how on earth should we get the current app and detect its change?
 
 `NSWorkspace.shared` has a `frontmostApplication` field, the changes of which are even observable.
 Thus, it is very tempting to get the app bundle ID directly from there:
@@ -195,12 +196,143 @@ The `AX` prefix here seems to stand for
 This makes perfect sense, since the aforementioned proprietary apps also need
 accessibility privileges to run in the first place!
 
-Unfortunately, using `AXObserver*` APIs in this case has two main difficulties:
+At this point, the plan for the next step is quite clear:
+I need to detect every single `kAXFocusedWindowChangedNotification` or
+`kAXApplicationHiddenNotification` message in order to correctly find out the current app!
+Sounds tedious, isn't it?
+
+To make things worse, using `AXObserver*` APIs for this purpose has two main difficulties:
 
 - Those APIs are old C-style ones, which require another kind of dance to call,
  completely different from what we have seen previously.
-- Those APIs are called on a per-PID basis, which means I have to maintain a list of PIDs,
-  each associated with an individual observer.
+- Those APIs are called on a per-PID basis, but I am not sure what PIDs will be useful to me.
+
+#### The Carbon Dance
+
+The [Carbon Accessibility](https://developer.apple.com/documentation/applicationservices/carbon_accessibility) APIs
+which belong to Apple's C-based Carbon framework,
+seem to date from as early as Mac OS X v10.2,
+and since most Carbon APIs have already been deprecated since v10.8,
+Apple obviously didn't take the time to provide high-level abstractions for them.
+
+Luckily, I have found just the right amount of info to make my `WindowChangeObserver` work
+in [this Chinese blog post](https://juejin.cn/post/6919716600543182855).
+As it turns out, the way of calling `AXObserver*` APIs looks quite like the Objective-C snippet
+in the [Detecting Input Source Changes](#detecting-input-source-changes) section,
+but this time, I'm writing all of this in Swift rather than in C.
+
+The first thing to do is to declare `WindowChangeObserver` as a subclass of `NSObject`:
+
+```swift
+class WindowChangeObserver: NSObject {
+  var currentAppPID: pid_t
+  var element: AXUIElement
+  var rawObserver: AXObserver?
+
+  let notifNames =
+    [
+      kAXFocusedWindowChangedNotification:
+        Claveilleur.focusedWindowChangedNotification,
+      kAXApplicationHiddenNotification:
+        Claveilleur.appHiddenNotification,
+    ] as [CFString: Notification.Name]
+
+  ...
+}
+```
+
+The `notifNames` mapping above not only gives the two types of messages that we care about,
+but also helps convert `kAX*` messages to regular `Notification.Name`,
+so that we can send them to a `NotificationCenter` and handle them in the "old" way.
+
+Next, we declare the callback for the observer:
+
+```swift
+class WindowChangeObserver: NSObject {
+  ...
+
+  let observerCallbackWithInfo: AXObserverCallbackWithInfo = {
+    (observer, element, notif, userInfo, refcon) in
+    guard let refcon = refcon else {
+      return
+    }
+    let slf = Unmanaged<WindowChangeObserver>.fromOpaque(refcon).takeUnretainedValue()
+    log.debug("WindowChangeObserver: received \(notif) from \(slf.currentAppPID)")
+
+    guard let notifName = slf.notifNames[notif] else {
+      log.warning("\(#function): unknown notification `\(notif)` detected")
+      return
+    }
+    localNotificationCenter.post(
+      name: notifName,
+      object: slf.currentAppPID
+    )
+  }
+
+  ...
+}
+```
+
+We need to remember that Carbon is a C-based framework,
+so naturally we are declaring a C-compatible callback above.
+That is to say, despite being written as a Swift closure,
+we are not allowed to capture any variable from the environment in the callback,
+and the `self` reference is hidden in the `refcon` parameter.
+
+However, apart from this restriction, what the callback does is still quite clear:
+it simply sends the converted `Notification.Name` to `localNotificationCenter`.
+
+The implementation of `init` and `deinit` methods is quite boring,
+since they do almost nothing other than initializing
+and deinitializing `self.rawObserver` respectively:
+
+```swift
+class WindowChangeObserver: NSObject {
+  ...
+
+  init(pid: pid_t) throws {
+    currentAppPID = pid
+    element = AXUIElementCreateApplication(currentAppPID)
+    super.init()
+
+    try AXObserverCreateWithInfoCallback(
+      currentAppPID,
+      observerCallbackWithInfo,
+      &rawObserver
+    )
+    .unwrap()
+
+    let selfPtr = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+    try notifNames.keys.forEach {
+      try AXObserverAddNotification(rawObserver!, element, $0, selfPtr).unwrap()
+    }
+    CFRunLoopAddSource(
+      CFRunLoopGetCurrent(),
+      AXObserverGetRunLoopSource(rawObserver!),
+      CFRunLoopMode.defaultMode
+    )
+  }
+
+  deinit {
+    CFRunLoopRemoveSource(
+      CFRunLoopGetCurrent(),
+      AXObserverGetRunLoopSource(rawObserver!),
+      CFRunLoopMode.defaultMode
+    )
+    notifNames.keys.forEach {
+      do {
+        try AXObserverRemoveNotification(rawObserver!, element, $0).unwrap()
+      } catch {}
+    }
+  }
+}
+```
+
+#### The Quartz Dance
+
+Quartz is the name of the macOS window server.
+
+TODO: <https://developer.apple.com/documentation/coregraphics/quartz_window_services>
 
 ### Registering a `launchd` Daemon
 
