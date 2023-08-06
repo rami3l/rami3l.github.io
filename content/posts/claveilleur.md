@@ -201,22 +201,29 @@ I need to detect every single `kAXFocusedWindowChangedNotification` or
 `kAXApplicationHiddenNotification` message in order to correctly find out the current app!
 Sounds tedious, isn't it?
 
-To make things worse, using `AXObserver*` APIs for this purpose has two main difficulties:
+To make things worse, using `AXObserver*` APIs for this purpose has some main difficulties:
 
 - Those APIs are old C-style ones, which require another kind of dance to call,
  completely different from what we have seen previously.
 - Those APIs are called on a per-PID basis, but I am not sure what PIDs will be useful to me.
+- The business logic of getting the current app is since disconnected from
+  the way of detecting current app changes.
 
-#### The Carbon Dance
+#### Receiving `kAX*` Messages for a Single PID
 
-The [Carbon Accessibility](https://developer.apple.com/documentation/applicationservices/carbon_accessibility) APIs
+Now, let's implement the detection and handling of `kAX*` messages
+in the `WindowChangeObserver` class.
+
+Sadly, we can not write this part of the code directly in the FRP style:
+the [Carbon Accessibility](https://developer.apple.com/documentation/applicationservices/carbon_accessibility) APIs,
 which belong to Apple's C-based Carbon framework,
 seem to date from as early as Mac OS X v10.2,
-and since most Carbon APIs have already been deprecated since v10.8,
-Apple obviously didn't take the time to provide high-level abstractions for them.
+but most Carbon APIs have already been deprecated since v10.8,
+so Apple obviously didn't take the time to provide high-level abstractions for them.
 
-Luckily, I have found just the right amount of info to make my `WindowChangeObserver` work
-in [this Chinese blog post](https://juejin.cn/post/6919716600543182855).
+However, I did find just the right amount of info
+in [this Chinese blog post](https://juejin.cn/post/6919716600543182855)
+to make my `WindowChangeObserver` work.
 As it turns out, the way of calling `AXObserver*` APIs looks quite like the Objective-C snippet
 in the [Detecting Input Source Changes](#detecting-input-source-changes) section,
 but this time, I'm writing all of this in Swift rather than in C.
@@ -241,7 +248,7 @@ class WindowChangeObserver: NSObject {
 }
 ```
 
-The `notifNames` mapping above not only gives the two types of messages that we care about,
+The `notifNames` mapping here not only gives the two types of messages that we care about,
 but also helps convert `kAX*` messages to regular `Notification.Name`,
 so that we can send them to a `NotificationCenter` and handle them in the "old" way.
 
@@ -284,7 +291,7 @@ it simply sends the converted `Notification.Name` to `localNotificationCenter`.
 
 The implementation of `init` and `deinit` methods is quite boring,
 since they do almost nothing other than initializing
-and deinitializing `self.rawObserver` respectively:
+and deinitializing `rawObserver` respectively:
 
 ```swift
 class WindowChangeObserver: NSObject {
@@ -328,19 +335,196 @@ class WindowChangeObserver: NSObject {
 }
 ```
 
-#### The Quartz Dance
+... where `.unwrap()` is just a convenience method to convert `AXError`s to exceptions
+and throw them.
 
-Quartz is the name of the macOS window server.
+```swift
+extension AXError {
+  /// Throws a conventional runtime error if this `AXError` is not `.success`.
+  func unwrap() throws {
+    guard case .success = self else {
+      throw AXUIError.axError("AXUI function failed with `\(self)`")
+    }
+  }
+}
+```
 
-TODO: <https://developer.apple.com/documentation/coregraphics/quartz_window_services>
+#### Tracking the Interesting PIDs
 
-### Registering a `launchd` Daemon
+This time, let's maintain a collection of `WindowChangeObserver`s for each useful PID
+in the `RunningAppsObserver` class.
+
+As usual, `RunningAppsObserver` should be declared as a subclass of `NSObject`:
+
+```swift
+class RunningAppsObserver: NSObject {
+  @objc var currentWorkSpace: NSWorkspace
+  var rawObserver: NSKeyValueObservation?
+
+  var windowChangeObservers = [pid_t: WindowChangeObserver?]()
+
+  convenience override init() {
+    self.init(workspace: NSWorkspace.shared)
+  }
+
+  ...
+}
+```
+
+Here, `rawObserver` will be initialized to an Objective-C key-value observation
+of `currentWorkSpace.runningApplications`,
+which is responsible for maintaining the `windowChangeObservers` collection
+by repeatedly calculating the latest changes in the observed collection of running apps:
+
+```swift
+class RunningAppsObserver: NSObject {
+  ...
+
+  init(workspace: NSWorkspace) {
+    currentWorkSpace = workspace
+    windowChangeObservers =
+      Dictionary(
+        uniqueKeysWithValues:
+          Self.getWindowChangePIDs(for: currentWorkSpace)
+          .map { ($0, try? WindowChangeObserver(pid: $0)) }
+      )
+    super.init()
+
+    rawObserver = currentWorkSpace.observe(\.runningApplications) {
+      workspace,
+      _ in
+      let oldKeys = Set(self.windowChangeObservers.keys)
+      let newKeys = Self.getWindowChangePIDs(for: workspace)
+
+      let toRemove = oldKeys.subtracting(newKeys)
+      if !toRemove.isEmpty {
+        log.debug("RunningAppsObserver: removing from windowChangeObservers: \(toRemove)")
+      }
+      toRemove.forEach {
+        self.windowChangeObservers.removeValue(forKey: $0)
+      }
+
+      let toAdd = newKeys.subtracting(oldKeys)
+      if !toAdd.isEmpty {
+        log.debug("RunningAppsObserver: adding to windowChangeObservers: \(toAdd)")
+      }
+      toAdd.forEach {
+        self.windowChangeObservers[$0] = try? WindowChangeObserver(pid: $0)
+      }
+    }
+  }
+
+  ...
+}
+```
+
+Finally, thanks to the directions of [this Python snippet](https://gist.github.com/ljos/3040846),
+we can use [Quartz Window Services](https://developer.apple.com/documentation/coregraphics/quartz_window_services) [^3]
+to obtain the collection of "interesting" PIDs ("interesting" as in "having a GUI"):
+
+```swift
+class RunningAppsObserver: NSObject {
+  ...
+
+  static func getWindowChangePIDs(
+    for workspace: NSWorkspace
+  ) -> Set<pid_t> {
+    let includingWindowAppPIDs =
+      (CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID)!
+      as Array)
+      .compactMap { $0.object(forKey: kCGWindowOwnerPID) as? pid_t }
+
+    return Set(
+      workspace.runningApplications.lazy
+        .map { $0.processIdentifier }
+        .filter { includingWindowAppPIDs.contains($0) }
+    )
+  }
+}
+```
+
+To this point, we have finally obtained an observer that can detect current window changes
+from an automatically-adjusted range of PIDs and send
+`Claveilleur.focusedWindowChangedNotification` or `Claveilleur.appHiddenNotification`
+messages to `localNotificationCenter` accordingly:
+
+```swift
+let runningAppsObserver = RunningAppsObserver()
+```
+
+#### Consuming the Messages
+
+After all the above efforts, we can finally return to the familiar FRP-style APIs.
+
+First, we have a bunch of different bundle ID-generating publishers,
+all likely to indicate a new current app:
+
+```swift
+let focusedWindowChangedPublisher =
+  localNotificationCenter
+  .publisher(for: Claveilleur.focusedWindowChangedNotification)
+  .compactMap { getAppBundleID(forPID: $0.object as! pid_t) }
+
+let didActivateAppPublisher = NSWorkspace
+  .shared
+  .notificationCenter
+  .publisher(for: NSWorkspace.didActivateApplicationNotification)
+  .compactMap(getAppBundleID(forNotification:))
+
+let appHiddenPublisher =
+  localNotificationCenter
+  .publisher(for: Claveilleur.appHiddenNotification)
+  .compactMap { _ in getCurrentAppBundleID() }
+```
+
+Then, all we need to do is to declare another observer that consumes all those publishers,
+and saves or loads input sources according to the current app:
+
+```swift
+let appActivatedObserver =
+  focusedWindowChangedPublisher
+  .merge(with: didActivateAppPublisher, appHiddenPublisher)
+  .removeDuplicates()
+  .sink { currentApp in
+    log.debug("appActivatedObserver: detected activation of app: \(currentApp)")
+
+    guard
+      let oldInputSource = loadInputSource(forApp: currentApp),
+      setInputSource(to: oldInputSource)
+    else {
+      let newInputSource = getInputSource()
+      log.info(
+        "appActivatedObserver: registering input source for `\(currentApp)` as: \(newInputSource)"
+      )
+      saveInputSource(newInputSource, forApp: currentApp)
+      return
+    }
+  }
+```
+
+#### Getting the Current App
+
+Now, the core functionality of `Claveilleur` is complete.
+With so much time being spent detecting current app **changes**,
+the only missing piece in the puzzle [^4] seems to be
+the way of actually getting the current app.
+
+Long story short: I haven't completely figured that part out.
+I have found different ways of doing this,
+but it seems to me that every single one of them might fail
+in one way or another under certain circumstances.
+
+At the time of writing, this is achieved by
+[combining `AXUIElementGetPid` results and `NSWorkspace` ones](https://github.com/rami3l/Claveilleur/blob/fb591deca97463a4f20e60d6cface75881c82c35/Sources/AppUtils.swift),
+which seems to yield the correct result for over 90% of the time.
 
 ### Getting Accessibility Privileges
 
-### Distribution via GoReleaser
+TODO
 
-### Code Signing & Making a Single-Binary Bundle
+#### Code Signing & Making a Single-Binary Bundle
+
+TODO
 
 [^1]: However, turning on this feature on Windows will lead to another issue
 where the task bar is also considered as an app.
@@ -349,3 +533,9 @@ My friend [`Icecovery`](https://github.com/Icecovery)'s
 provides more details on it and a (hacky) workaround.
 
 [^2]: ... but I still have to download Xcode from the Mac App Store to get the full macOS SDK :(
+
+[^3]: Quartz is the name of the macOS window server.
+
+[^4]: Apart from the part of getting and setting the current input source
+(which fits nicely into [~30 lines of Objective-C](https://github.com/daipeihust/im-select/blob/9cd5278b185a9d6daa12ba35471ec2cc1a2e3012/macOS/im-select/im-select/main.m)),
+that is.
