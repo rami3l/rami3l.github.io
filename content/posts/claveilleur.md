@@ -9,7 +9,7 @@ tags = ["macOS", "Swift", "keyboard"]
 
 > Now playing: [Bad Apple!!](https://www.youtube.com/watch?v=FtutLA63Cp8)
 
-## The Problem
+## Problem
 
 Being a polyglot can be painful sometimes.
 
@@ -43,7 +43,7 @@ Whence comes [`Claveilleur`](https://github.com/rami3l/Claveilleur),
 my own open-source macOS input source switching daemon,
 whose name comes from the French words for keyboard (clavier) and watchman (veilleur).
 
-## The Workflow
+## Workflow
 
 Just one caveat before we actually begin: I'm not your regular Apple developer.
 
@@ -66,7 +66,7 @@ this does seem to provide the level of VSCode support that
 I would expect from a popular programming language.
 Thus, `Claveilleur` was made entirely without launching Xcode. [^2]
 
-## The Solution
+## Solution
 
 I want `Claveilleur` to be a CLI app in the style of
 [`skhd`](https://github.com/koekeishiya/skhd)
@@ -518,13 +518,105 @@ At the time of writing, this is achieved by
 [combining `AXUIElementGetPid` results and `NSWorkspace` ones](https://github.com/rami3l/Claveilleur/blob/fb591deca97463a4f20e60d6cface75881c82c35/Sources/AppUtils.swift),
 which seems to yield the correct result for over 90% of the time.
 
-### Getting Accessibility Privileges
+### Correctly Getting Accessibility Privileges
 
-TODO
+When configuring the CI builds for `Claveilleur`,
+a natural idea is to build a Universal 2 (a.k.a. "fat") binary that supports both
+x64 and ARM64 architectures:
 
-#### Code Signing & Making a Single-Binary Bundle
+```sh
+swift build -c release --arch arm64 --arch x86_64
+```
 
-TODO
+However, when running this build on ARM-based Macs,
+it seemed that the Accessibility Privileges can never be granted
+([Claveilleur/#2](https://github.com/rami3l/Claveilleur/issues/2)).
+
+That is, the following function always returns `false`:
+
+```swift
+/// Returns if the right privileges have been granted to use the Accessibility APIs.
+func hasAXPrivilege() -> Bool {
+  let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): kCFBooleanTrue] as CFDictionary
+  return AXIsProcessTrustedWithOptions(options)
+}
+```
+
+As it turns out, this has something to do with
+the code signing rules that macOS is enforcing.
+It just so happens that when the app is not a macOS bundle,
+[it could be very hard get it signed correctly](https://www.smileykeith.com/2021/10/05/codesign-m1).
+
+I solved this problem by first creating
+a minimal bundle manifest under `Supporting/Info.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>CFBundleIdentifier</key>
+        <string>io.github.rami3l.Claveilleur</string>
+        <key>CFBundleShortVersionString</key>
+        <string>0.1.0</string>
+        <key>CFBundlePackageType</key>
+        <string>BNDL</string>
+        <key>NSHumanReadableCopyright</key>
+        <string>Copyright © 2023 rami3l. All rights reserved.</string>
+    </dict>
+</plist>
+```
+
+... then embedding the manifest into the executable [^5] like so:
+
+```swift
+// Package.swift
+let package = Package(
+  ...
+  targets: [
+    .executableTarget(
+      name: "Claveilleur",
+      ...
+      // https://forums.swift.org/t/swift-package-manager-use-of-info-plist-use-for-apps/6532/13
+      linkerSettings: [
+        .unsafeFlags([
+          "-Xlinker", "-sectcreate",
+          "-Xlinker", "__TEXT",
+          "-Xlinker", "__info_plist",
+          "-Xlinker", "Supporting/Info.plist",
+        ])
+      ]
+    )
+  ]
+)
+```
+
+... and just to be sure, signing the CI build again before publishing:
+
+```bash
+codesign -dvvv --force --sign - \
+  "$(swift build --show-bin-path -c release --arch arm64 --arch x86_64)/claveilleur"
+```
+
+## Conclusion
+
+This is in fact only my second time doing Swift
+(after [`Ouverture`](https://github.com/rami3l/Ouverture)),
+and my feelings towards this overall experience are
+still quite complicated at this moment.
+
+On the one hand, Swift does seem like a beautifully-designed programming language
+to me, which, just like Rust,
+cares a lot about bringing modern features and patterns
+into a traditional procedural/object-oriented context.
+
+On the other hand, it seems to me that even as a somewhat experienced developer,
+having to use quite a bunch of under-documented and
+under-maintained APIs is still a major issue
+while getting my hands on macOS desktop development.
+
+I wish Apple could realize this issue and...
+change things for the better in the future, maybe?
 
 [^1]: However, turning on this feature on Windows will lead to another issue
 where the task bar is also considered as an app.
@@ -532,10 +624,14 @@ My friend [`Icecovery`](https://github.com/Icecovery)'s
 [`IMEIndicator`](https://github.com/Icecovery/IMEIndicator)
 provides more details on it and a (hacky) workaround.
 
-[^2]: ... but I still have to download Xcode from the Mac App Store to get the full macOS SDK :(
+[^2]: I still had to download Xcode from the Mac App Store to get the full macOS SDK :(
 
 [^3]: Quartz is the name of the macOS window server.
 
 [^4]: Apart from the part of getting and setting the current input source
 (which fits nicely into [~30 lines of Objective-C](https://github.com/daipeihust/im-select/blob/9cd5278b185a9d6daa12ba35471ec2cc1a2e3012/macOS/im-select/im-select/main.m)),
 that is.
+
+[^5]: If you are using Rust for macOS desktop development,
+the [`embed_plist`](https://crates.io/crates/embed_plist)
+crate might do the work for you.
