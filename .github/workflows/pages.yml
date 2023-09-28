@@ -24,14 +24,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4
+        with:
+          submodules: true # Fetch Hugo themes (true OR recursive)
+          fetch-depth: 0 # Fetch all history for .GitInfo and .Lastmod
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v2
+        with:
+          hugo-version: "latest"
+          # extended: true
+
       - name: Build
-        uses: shalzz/zola-deploy-action@v0.17.2
-        env:
-          BUILD_ONLY: true
-          CHECK_LINKS: true
-          BUILD_FLAGS: ${{ github.ref != 'refs/heads/master' && '--drafts' || '' }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: hugo --minify
+
+      # TODO: Check links?
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         if: github.ref == 'refs/heads/master'
