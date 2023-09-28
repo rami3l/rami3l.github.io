@@ -3,7 +3,6 @@ title = "The Making of Claveilleur"
 date = "2023-08-03"
 description = "The extremely simple macOS input source switching daemon behind the scenes."
 
-[taxonomies]
 tags = ["macOS", "Swift", "keyboard"]
 +++
 
@@ -204,7 +203,7 @@ Sounds tedious, isn't it?
 To make things worse, using `AXObserver*` APIs for this purpose has some main difficulties:
 
 - Those APIs are old C-style ones, which require another kind of dance to call,
- completely different from what we have seen previously.
+  completely different from what we have seen previously.
 - Those APIs are called on a per-PID basis, but I am not sure what PIDs will be useful to me.
 - The business logic of getting the current app is since disconnected from
   the way of detecting current app changes.
@@ -618,20 +617,21 @@ while getting my hands on macOS desktop development.
 I wish Apple could realize this issue and...
 change things for the better in the future, maybe?
 
-[^1]: However, turning on this feature on Windows will lead to another issue
-where the task bar is also considered as an app.
-My friend [`Icecovery`](https://github.com/Icecovery)'s
-[`IMEIndicator`](https://github.com/Icecovery/IMEIndicator)
-provides more details on it and a (hacky) workaround.
+[^1]:
+    However, turning on this feature on Windows will lead to another issue
+    where the task bar is also considered as an app.
+    My friend [`Icecovery`](https://github.com/Icecovery)'s
+    [`IMEIndicator`](https://github.com/Icecovery/IMEIndicator)
+    provides more details on it and a (hacky) workaround.
 
 [^2]: I still had to download Xcode from the Mac App Store to get the full macOS SDK :(
-
 [^3]: Quartz is the name of the macOS window server.
+[^4]:
+    Apart from the part of getting and setting the current input source
+    (which fits nicely into [~30 lines of Objective-C](https://github.com/daipeihust/im-select/blob/9cd5278b185a9d6daa12ba35471ec2cc1a2e3012/macOS/im-select/im-select/main.m)),
+    that is.
 
-[^4]: Apart from the part of getting and setting the current input source
-(which fits nicely into [~30 lines of Objective-C](https://github.com/daipeihust/im-select/blob/9cd5278b185a9d6daa12ba35471ec2cc1a2e3012/macOS/im-select/im-select/main.m)),
-that is.
-
-[^5]: If you are using Rust for macOS desktop development,
-the [`embed_plist`](https://crates.io/crates/embed_plist)
-crate might do the work for you.
+[^5]:
+    If you are using Rust for macOS desktop development,
+    the [`embed_plist`](https://crates.io/crates/embed_plist)
+    crate might do the work for you.

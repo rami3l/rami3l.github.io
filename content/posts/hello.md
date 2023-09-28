@@ -1,9 +1,8 @@
 +++
 title = "Hello, World!"
-date = "2023-08-03"
+date = "2023-08-02"
 description = "Same scratchpad, different day."
 
-[taxonomies]
 tags = ["announcement"]
 +++
 

@@ -1,0 +1,67 @@
+baseURL = "https://rami3l.github.io"
+title = "rami3l's scratchpad"
+languageCode = "en-us"
+
+# https://adityatelange.github.io/hugo-PaperMod/posts/papermod
+theme = "PaperMod"
+
+# https://github.com/adityatelange/hugo-PaperMod/blob/exampleSite/config.yml
+enableInlineShortcodes = true
+enableRobotsTXT = true
+buildDrafts = false
+buildFuture = false
+buildExpired = false
+enableEmoji = true
+pygmentsUseClasses = true
+# googleAnalytics = UA-123-45
+
+[languages.en]
+languageName = "English"
+weight = 1
+
+[languages.en.taxonomies]
+category = "categories"
+tag = "tags"
+series = "series"
+
+[[languages.en.menu.main]]
+name = "Archives"
+url = "archives/"
+weight = 5
+
+[[languages.en.menu.main]]
+name = "Search"
+url = "search/"
+weight = 10
+
+[[languages.en.menu.main]]
+name = "Tags"
+url = "tags/"
+weight = 10
+
+[outputs]
+home = ["HTML", "RSS", "JSON"]
+
+[params]
+defaultTheme = "auto"
+ShowShareButtons = false
+ShowReadingTime = true
+displayFullLangName = false
+ShowPostNavLinks = true
+ShowBreadCrumbs = true
+ShowCodeCopyButtons = true
+ShowRssButtonInSectionTermList = true
+ShowToc = true
+tocopen = true
+
+# [params.homeInfoParams]
+# Content = """
+# """
+
+[[params.socialIcons]]
+name = "github"
+url = "https://github.com/rami3l"
+
+[minify]
+disableXML = true
+minifyOutput = true
