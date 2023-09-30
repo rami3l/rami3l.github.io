@@ -86,7 +86,7 @@ It did take me quite some time to find the right search engine keywords,
 navigate to this very [`StackOverflow answer`](https://stackoverflow.com/a/26697027),
 and have some slightest clue about what this Objective-C snippet is doing:
 
-```objective-c
+```objc
 [[NSDistributedNotificationCenter defaultCenter]
            addObserver:self
               selector:@selector(myMethod:)
