@@ -1,0 +1,11 @@
+.emgithub-file .hljs-ln {
+  font-size: 18px;
+}
+
+.post-content
+  table:not(.highlighttable, .highlight table, .gist .highlight)
+  td.hljs-ln-line {
+  padding: 0;
+  font-size: 0.78em;
+  font-family: monospace;
+}
