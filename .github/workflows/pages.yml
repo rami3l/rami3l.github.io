@@ -36,7 +36,9 @@ jobs:
           # extended: true
 
       - name: Build
-        run: hugo --minify
+        run: |
+          hugo mod get -u ./...
+          hugo --minify
 
       # TODO: Check links?
 
