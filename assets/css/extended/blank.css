@@ -1,0 +1,27 @@
+/* Fix scrollbar for Safari users. */
+/* See: https://github.com/adityatelange/hugo-PaperMod/issues/654#issuecomment-1015819905 */
+::-webkit-scrollbar-track {
+  background: var(--theme);
+}
+
+/* Fix `emgithub` appearance. */
+.emgithub-file .hljs-ln {
+  font-size: 18px;
+}
+
+.post-content
+  table:not(.highlighttable, .highlight table, .gist .highlight)
+  td.hljs-ln-line {
+  padding: 0;
+  border-style: none;
+  font-size: 0.78em;
+  font-family: monospace;
+}
+
+.post-content .emgithub-file pre code.hljs {
+  border-radius: 0;
+}
+
+.emgithub-file ::-webkit-scrollbar-track {
+  background: transparent;
+}
