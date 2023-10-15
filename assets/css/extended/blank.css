@@ -1,6 +1,6 @@
 /* Fix scrollbar for Safari users. */
 /* See: https://github.com/adityatelange/hugo-PaperMod/issues/654#issuecomment-1015819905 */
-::-webkit-scrollbar-track {
+::-webkit-scrollbar-track:vertical {
   background: var(--theme);
 }
 

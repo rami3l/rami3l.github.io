@@ -51,9 +51,11 @@ ShowRssButtonInSectionTermList = true
 ShowToc = true
 tocopen = true
 
-# [params.homeInfoParams]
-# Content = """
-# """
+[params.homeInfoParams]
+Title = "rami3l"
+Content = """
+Le vent se lève ! Il faut tenter de vivre.
+"""
 
 [[params.socialIcons]]
 name = "github"
