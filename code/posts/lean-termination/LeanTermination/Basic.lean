@@ -11,25 +11,18 @@ example : fact <$> [1, 2, 3, 4, 5, 6] = [1, 2, 6, 24, 120, 720] := rfl
 def factₜ : ℕ → ℕ
 | 0 => 1
 | n + 1 => (n + 1) * factₜ n
-termination_by _ n => n
+termination_by factₜ n => n
+
+example : sizeOf 42 = 42 := rfl
 
 def factₛ : ℕ → ℕ
 | 0 => 1
 | n + 1 => (n + 1) * factₛ n
-termination_by _ n => sizeOf n
-
-example : sizeOf 42 = 42 := rfl
-
-def factₛ' : ℕ → ℕ
-| 0 => 1
-| n + 1 => (n + 1) * factₛ' n
 termination_by
   _ n => n
 decreasing_by
   -- `instWellFoundedRelation` basically converts the "decrease" of any sized argument
   -- to the "decrease" of its size.
-  -- For `n : ℕ` this is not necessary (since `sizeOf n` is defined as `n` itself),
-  -- but we are doing it here for the demo's sake.
   show instWellFoundedRelation.rel n n.succ;                  unfold instWellFoundedRelation
   show @WellFoundedRelation.rel ℕ sizeOfWFRel n n.succ;       unfold sizeOfWFRel
   show @WellFoundedRelation.rel ℕ (measure sizeOf) n n.succ;  unfold measure

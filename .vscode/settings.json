@@ -1,3 +1,4 @@
 {
-  "git.openRepositoryInParentFolders": "always"
+  "git.openRepositoryInParentFolders": "always",
+  "lean4.input.languages": ["lean4", "lean", "markdown"]
 }
