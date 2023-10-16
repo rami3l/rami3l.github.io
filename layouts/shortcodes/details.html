@@ -1,0 +1,8 @@
+{{/* https://stackoverflow.com/a/71703912 */}}
+{{/* In order to get this
+working, you need to set `markup.goldmark.renderer.unsafe = true`.*/}}
+
+<details>
+  <summary>{{ (.Get 0) | markdownify }}</summary>
+  {{ .Inner | markdownify }}
+</details>

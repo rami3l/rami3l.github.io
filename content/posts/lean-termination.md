@@ -80,15 +80,14 @@ and we have to use a [well-founded (WF) recursion] [^wf-rec] instead?
 
     <!-- markdownlint-disable-line -->
 
-    - Either has nothing to do with `f`;
+    - Either has nothing to do with `f` (the base case);
     - Or depends on some `f w` where `w : α`,
       and there exists a
       [WF relation](https://en.wikipedia.org/wiki/Well-founded_relation)
       `≺` ("smaller") that ensures `w ≺ v`,
-      so that the "routing table" _won't_:
-      - Form a loop (e.g. `f a := f b; f b := f a`);
-      - Or forward all the way down without ever falling back to any base case
-        (e.g. `f (a : ℤ) := f (a - 1)`).
+      so that the body can be written in such a way that depends exclusively
+      on some base cases.
+      This prevents infinite recursions from happening.
 
 Again, looking at the [docs](https://lean-lang.org/theorem_proving_in_lean4/induction_and_recursion.html#well-founded-recursion-and-induction),
 it seems that this is as easy as adding a `termination_by` clause:
@@ -126,6 +125,67 @@ is already included in `decreasing_trivial`:
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L22-L28" >}}
 
 What if we want to write a `decreasing_by` clause by ourselves?
+
+In practice, you should try to benefit from the existing infrastructure by _extending_
+the `decreasing_trivial` macro with an extra `macro_rules` declaration,
+as stated in the comments below:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L17-L20" >}}
+
+For the sake of the demo, let's write a similar proof by hand,
+but this time with another `wf` instance, `instWellFoundedRelation`:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L193-L194" >}}
+
+> {{< details "More details on this definition" >}}
+
+... where `sizeOfWFRel` is defined as follows:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L190-L191" >}}
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L187-L188" >}}
+
+... and `invImage` as follows:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L127-L129" >}}
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/Core.lean#L938-L939" >}}
+
+All those definitions above give:
+
+```lean
+  instWellFoundedRelation
+= sizeOfWFRel
+= measure sizeOf
+= invImage sizeOf Nat.lt_wfRel
+= let f := InvImage WellFoundedRelation.rel sizeOf;
+  { rel := f, wf := (_ : WellFounded f) }
+= let f a b := sizeOf a < sizeOf b;
+  { rel := f, wf := (_ : WellFounded f) }
+```
+
+{{< /details >}}
+
+# TODO introduce `sizeOf`, sized types, `SizeOf`
+
+In short, `instWellFoundedRelation` ensures that every sized type `α`
+(hence the implicit instance parameter `[SizeOf α]`)
+satisfies `WellFoundedRelation α`,
+in the sense that `Nat.lt` _over its size_ is well-founded:
+
+```lean
+  instWellFoundedRelation.rel
+= (let f a b := sizeOf a < sizeOf b; { rel := f, wf := (_ : WellFounded f) }).rel
+= let f a b := sizeOf a < sizeOf b; f
+= (sizeOf · < sizeOf ·)
+```
+
+Now we are ready to write our `decreasing_by` clause by hand
+(just to prove it is possible, please don't try this at home):
+
+{{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=18 to=29 >}}
+
+# TODO `termination_by` with `_`
+
+# TODO show tactic
 
 <!-- {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L33-L44" >}} -->
 <!-- {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L12-L13" >}} -->

@@ -39,6 +39,9 @@ weight = 10
 [outputs]
 home = ["HTML", "RSS", "JSON"]
 
+[markup.goldmark.renderer]
+unsafe = true
+
 [params]
 defaultTheme = "auto"
 ShowShareButtons = false

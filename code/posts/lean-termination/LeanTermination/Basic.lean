@@ -21,8 +21,6 @@ def factₛ : ℕ → ℕ
 termination_by
   _ n => n
 decreasing_by
-  -- `instWellFoundedRelation` basically converts the "decrease" of any sized argument
-  -- to the "decrease" of its size.
   show instWellFoundedRelation.rel n n.succ;                  unfold instWellFoundedRelation
   show @WellFoundedRelation.rel ℕ sizeOfWFRel n n.succ;       unfold sizeOfWFRel
   show @WellFoundedRelation.rel ℕ (measure sizeOf) n n.succ;  unfold measure
