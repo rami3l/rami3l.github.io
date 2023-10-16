@@ -1,8 +1,7 @@
 +++
-title = "Proving Termination in Lean 4"
+title = "Proving Termination in Lean 4, pt. 1"
 date = "2023-09-30"
 description = "Convince the prover that your function will terminate."
-draft = true
 
 tags = ["Lean", "prover"]
 +++
@@ -20,13 +19,14 @@ especially when I just couldn't get pass the termination check.
 
 Although I haven't seen every piece of the puzzle yet,
 I do hope that by sharing what I have seen so far,
-this blog post could save you some time from bashing "lean termination" into your search box,
-which could potentially lead you to some random web pages about
-[Lean Manufacturing](https://en.wikipedia.org/wiki/Lean_manufacturing) 😅
+this blog post could save you some time from bashing "lean termination" into your search box
+~~, which could potentially lead you to some random web pages about [Lean Manufacturing]~~.
+
+[Lean Manufacturing]: https://en.wikipedia.org/wiki/Lean_manufacturing
 
 ## Example: The Factorial
 
-Let's start with your old friend, the factorial function:
+Let's start with our old friend, the factorial function:
 
 {{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=1 to=1 >}}
 {{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=5 to=7 >}}
@@ -144,7 +144,7 @@ What if we want to write a `decreasing_by` clause by ourselves?
 
 In practice, you should try to benefit from the existing infrastructure by _extending_
 the `decreasing_trivial` macro with an extra `macro_rules` declaration,
-as stated in the comments below:
+as stated in the doc comments below:
 
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L17-L20" >}}
 
@@ -155,9 +155,12 @@ but this time with another instance, `instWellFoundedRelation : WellFounded ℕ`
 
 > {{< details "More details on this definition" >}}
 
-... where `sizeOfWFRel` is defined as follows:
+`sizeOfWFRel` is defined as follows:
 
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L190-L191" >}}
+
+... and `measure` as follows:
+
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L187-L188" >}}
 
 ... and `invImage` as follows:
@@ -180,7 +183,10 @@ All those definitions above give:
 
 {{< /details >}}
 
-TODO introduce `sizeOf`, sized types, `SizeOf`
+We say a type `α` is _sized_ if there is an instance of type `SizeOf α`.
+Here's how the `SizeOf` typeclass and its `sizeOf` function are introduced in the doc comments:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/SizeOf.lean#L12-L28" >}}
 
 In short, `instWellFoundedRelation` ensures that every sized type `α`
 (hence the implicit instance parameter `[SizeOf α]`)
@@ -208,7 +214,40 @@ you can write `_` instead of the name of the function `factₛ`.
 
 {{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=23 to=29 >}}
 
-TODO show tactic
+Don't be scared by the snippet above!
+I have carefully formatted the _tactics block_ (i.e. the block that follows `decreasing_by`)
+into two columns:
 
-<!-- {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L33-L44" >}} -->
-<!-- {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L12-L13" >}} -->
+- The left column is composed entirely of uses of the `show` tactic.
+  `show` is usually used to replace a goal's target to its unified version,
+  but here it's used carefully as a no-op
+  simply to illustrate the current state of the target on that line.
+
+- The right column contains all the actual tactics that we have used to complete the proof.
+
+As you can see,
+what we are doing in that snippet is basically replaying the equational reasoning above.
+The thing that the compiler really wants us to prove is in fact `sizeOf n < sizeOf n.succ`,
+but the statement is given in such a complicated way that
+a few times of definition `unfold`ing turned out to be necessary
+for us to see it more clearly.
+
+Also, this _is_ the same as `n < n + 1`, since `sizeOf n = n`.
+This is called `sizeOf_nat`:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/SizeOf.lean#L52" >}}
+
+After applying that `theorem` to our goal, the termination proof is completed for the third time.
+
+As a matter of fact, `decreasing_with` is defined as follows:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L33-L44" >}}
+
+... and `simp_wf` as follows:
+
+{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L12-L13" >}}
+
+Thanks to these carefully-written definitions,
+many recursions can be automatically proven to be "decreasing"
+with just the default `decreasing_tactic`.
+Kudos to the Lean compiler! 🙌
