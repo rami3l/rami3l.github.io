@@ -24,23 +24,30 @@ this blog post could save you some time from bashing "lean termination" into you
 which could potentially lead you to some random web pages about
 [Lean Manufacturing](https://en.wikipedia.org/wiki/Lean_manufacturing) 😅
 
-## The Factorial
+## Example: The Factorial
 
-### Proof by Structural Recursion
-
-Let's start with an old classic, the factorial function:
+Let's start with your old friend, the factorial function:
 
 {{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=1 to=1 >}}
 {{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=5 to=7 >}}
+
+This definition should be quite self-explanatory even for those who are not so familiar with Lean.
 
 We can add some "unit tests" to ensure that this is indeed the `fact` that we all know and love:
 
 {{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=9 to=9 >}}
 
+If the `<$>` infix operator here looks strange to you, don't worry!
+It is just another fancy way of writing your familiar
+[`array.map`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map)
+function.
+
+## Proof by Structural Recursion
+
 In trivial cases (like this one),
 it's quite possible that the termination proof is already done for you.
 
-The following might be an intuitive way of seeing how this proof is possible:
+An intuitive way of seeing how this proof is possible might be the following:
 
 1. `fact` has only one argument (let's call it `n : ℕ`),
    so in order to prove that `fact` terminates,
@@ -65,7 +72,7 @@ After all, `ℕ` is inductively defined:
 So you can see the decrease in `n`'s structure as a decrease in
 the number of constructors (`.zero`/`.succ`) required to construct `n`.
 
-### Proof by WF Recursion and `termination_by`
+## Proof by WF Recursion and `termination_by`
 
 What if the structural recursion doesn't work,
 and we have to use a [well-founded (WF) recursion] [^wf-rec] instead?
@@ -87,16 +94,21 @@ and we have to use a [well-founded (WF) recursion] [^wf-rec] instead?
       `≺` ("smaller") that ensures `w ≺ v`,
       so that the body can be written in such a way that depends exclusively
       on some base cases.
-      This prevents infinite recursions from happening.
+      This prevents infinite recursions from ever happening.
 
 Again, looking at the [docs](https://lean-lang.org/theorem_proving_in_lean4/induction_and_recursion.html#well-founded-recursion-and-induction),
 it seems that this is as easy as adding a `termination_by` clause:
 
 {{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=11 to=14 >}}
 
-The compiler will then try to find an implicit instance `wf : WellFounded ℕ`,
-(Spoiler: there is more than one!)
-and try to conclude that `n` is decreasing in terms of `wf.rel`.
+By explicitly pointing out the parameter `n`,
+we are actually doing the step `2.` above manually:
+you can see this as a way of informing the compiler that
+we need to prove that `n` decreases in some sense later on.
+
+The compiler will then try to perform step `3.` automatically,
+by searching for an implicit instance `wf : WellFounded ℕ`,
+and trying to conclude that `n` is decreasing in terms of `wf.rel`.
 
 Let's say it has found `Nat.lt_wfRel : WellFounded ℕ`,
 which stands for the well-foundedness of `Nat.lt` (i.e. the `<` operator on `ℕ`):
@@ -104,8 +116,6 @@ which stands for the well-foundedness of `Nat.lt` (i.e. the `<` operator on `ℕ
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L151-L153" >}}
 
 Since `n < n + 1` trivially holds, the termination proof is again completed.
-
-### Proof by WF Recursion and `decreasing_by`
 
 In fact, it is according not to us, but to the compiler that `n < n + 1` "trivially holds".
 When a `termination_by` clause is not followed by a `decreasing_by` clause,
@@ -115,7 +125,11 @@ a default one will be generated right beside it:
 decreasing_by decreasing_tactic
 ```
 
-... where `decreasing_tactic` is defined as follows:
+`decreasing_tactic`, as the name suggests, is a _tactic_.
+This means that `decreasing_by` activates the [_tactic mode_](https://lean-lang.org/theorem_proving_in_lean4/tactics.html#entering-tactic-mode),
+just like the usual `by` keyword does.
+
+This tactic is defined as follows:
 
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L52-L53" >}}
 
@@ -123,6 +137,8 @@ decreasing_by decreasing_tactic
 is already included in `decreasing_trivial`:
 
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L22-L28" >}}
+
+## Proof by WF Recursion and `decreasing_by`
 
 What if we want to write a `decreasing_by` clause by ourselves?
 
@@ -133,7 +149,7 @@ as stated in the comments below:
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L17-L20" >}}
 
 For the sake of the demo, let's write a similar proof by hand,
-but this time with another `wf` instance, `instWellFoundedRelation`:
+but this time with another instance, `instWellFoundedRelation : WellFounded ℕ`:
 
 {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L193-L194" >}}
 
@@ -164,7 +180,7 @@ All those definitions above give:
 
 {{< /details >}}
 
-# TODO introduce `sizeOf`, sized types, `SizeOf`
+TODO introduce `sizeOf`, sized types, `SizeOf`
 
 In short, `instWellFoundedRelation` ensures that every sized type `α`
 (hence the implicit instance parameter `[SizeOf α]`)
@@ -179,13 +195,20 @@ in the sense that `Nat.lt` _over its size_ is well-founded:
 ```
 
 Now we are ready to write our `decreasing_by` clause by hand
-(just to prove it is possible, please don't try this at home):
+(just to prove it is possible, please don't try this at home).
 
-{{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=18 to=29 >}}
+As usual, let's first copy the function declaration and the `termination_by` clause over:
 
-# TODO `termination_by` with `_`
+{{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=18 to=22 >}}
 
-# TODO show tactic
+A tiny syntax sugar here: in the `termination_by` clause,
+you can write `_` instead of the name of the function `factₛ`.
+
+... and here it is, the `decreasing_by` clause:
+
+{{< include file="code/posts/lean-termination/LeanTermination/Basic.lean" language="lean" from=23 to=29 >}}
+
+TODO show tactic
 
 <!-- {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L33-L44" >}} -->
 <!-- {{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L12-L13" >}} -->
