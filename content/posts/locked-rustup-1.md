@@ -45,13 +45,13 @@ This gives rise to another issue: what if a proxy (especially a long-running one
 such as `rust-analyzer`) wants to read a toolchain's certain files while we are
 making modifications to it? Wouldn't it cause incoherent reads?
 
-## Making It a Read-Write Lock?
+## Making It a Reader-Writer Lock?
 
-It should be relatively easy to turn the mutex into a read-write lock to prevent
-the aforementioned read-when-write scenario. For example, we could learn from
-`cargo` and use a named file (the so-called "lock dummy") designated by rustup
-to impose file-system locks and make use of the operating system's unlock
-notification mechanisms. Let's say we impose a write lock on "modifying"
+It should be relatively easy to turn the mutex into a reader-writer lock to
+prevent the aforementioned read-during-write scenario. For example, we could
+learn from `cargo` and use a named file (the so-called "lock dummy") designated
+by rustup to impose file-system locks and make use of the operating system's
+unlock notification mechanisms. Let's say we impose a write lock on "modifying"
 commands such as `rustup component add`, and a read lock otherwise, and the
 problem should be addressed?
 
