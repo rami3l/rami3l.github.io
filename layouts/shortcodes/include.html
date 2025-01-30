@@ -1,12 +1,6 @@
-{{/* https://gist.github.com/jbr/b59c5ca43ac30cff27fe037a71ebaedf */}}
-
-{{ $file := .Get "file" | readFile }}
-{{ $lines := split $file "\n" }}
-
-{{/* you may want to change this default */}}
-{{ $lang := default "rust" (.Get "language") }}
-
-{{ $start := default 1 (.Get "from") }}
-{{ $end := default (sub (len $lines) 1) (.Get "to") }}
-{{ $output := delimit (after (sub $start 1) (first $end $lines)) "\n" }}
-{{ (print "```" $lang "\n" $output "\n```") | markdownify}}
+{{/* https://gist.github.com/jbr/b59c5ca43ac30cff27fe037a71ebaedf */}} {{ $file
+:= .Get "file" | readFile }} {{ $lines := split $file "\n" }} {{/* you may want
+to change this default */}} {{ $lang := default "rust" (.Get "language") }} {{
+$start := default 1 (.Get "from") }} {{ $end := default (sub (len $lines) 1)
+(.Get "to") }} {{ $output := delimit (after (sub $start 1) (first $end $lines))
+"\n" }} {{ (print "```" $lang "\n" $output "\n```") | markdownify}}
