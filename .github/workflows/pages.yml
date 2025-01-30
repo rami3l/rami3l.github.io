@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0 # Fetch all history for .GitInfo and .Lastmod
 
       - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v2
+        uses: peaceiris/actions-hugo@v3
         with:
           hugo-version: "latest"
           # extended: true
@@ -43,7 +43,7 @@ jobs:
       # TODO: Check links?
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/master'
         with:
           path: ./public
@@ -58,4 +58,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
