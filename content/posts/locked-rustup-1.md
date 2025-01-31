@@ -22,6 +22,20 @@ mechanism to prevent concurrent invocation of its commands. The original issue
 explicitly mentioned that two concurrent `rustup component add` invocations
 (i.e. writing modifications) would cancel each other out with an error.
 
+In fact, this issue is also why we have this tiny detail in rustup's release
+notes when mentioning the update process:
+
+> If you have a previous version of rustup installed, getting rustup 1.XX.Y is
+> as easy as **stopping any programs which may be using rustup (e.g. closing
+> your IDE)** and running:
+>
+> ```console
+> $ rustup self update
+> ```
+
+... otherwise, if anything goes wrong, the only way out seems to be a complete
+uninstallation and reinstallation of one or more toolchains.
+
 Rustup's modifications to toolchains under its control are transactional. In
 other words, it will try to remember the individual steps it does to a toolchain
 and revert them in the case of transaction failures, such as errors when
@@ -67,13 +81,13 @@ I think there are several things happening at the same time with this issue that
 are preventing us from implementing the most obvious solutions above:
 
 1. Rustup's operations on its toolchains are transactional but not mutual
-   exclusive, and thus two concurrent operations can effectively cancel each
-   other out. Our downstream [elan#121] seems to have taken the simplest
-   approach to this issue, abandoning all the "resuming from interruption" logic
-   and just caring about the final state. This solution is pragmatic, but it is
-   probably not the most appropriate one for rustup, as our Rust distributions
-   are way more complex than their Lean 4 ones, with many more optional
-   components to choose from as well.
+   exclusive, and thus two concurrent operations can cause all sorts of errors,
+   and quite often inessential ones. Our downstream [elan#121] seems to have
+   taken the simplest approach to this issue, abandoning all the "resuming from
+   interruption" logic and just caring about the final state. This solution is
+   pragmatic, but it is probably not the most appropriate one for rustup, as our
+   Rust distributions are way more complex than their Lean 4 ones, with many
+   more optional components to choose from as well.
 
 2. Rustup calls can be arbitrarily nested, and the toolchain operations can
    happen in any layer. This prevents us from doing the classical "lock dummy"
@@ -85,23 +99,33 @@ inheritance of a `rustup` subprocess to overcome the issues related to recursive
 invocations.
 
 So far, however, every solution that I have come up with either fails with
-certain (mostly recursive) `rustup` usage patterns or is making strange
-assumptions about how one is using rustup. Notably, a `fcntl()`-based solution
-implements lock inheritance by `execvp()`, which has no Windows equivalent; the
+certain (mostly recursive) usage patterns or is making strange assumptions about
+how one is using rustup. Notably, a `fcntl()`-based solution implements lock
+inheritance via `execvp()`, which unfortunately has no Windows equivalent. The
 most promising solution so far that ensures platform compatibility seems to be a
 "lock server daemon" which is a bit like the Gradle Daemon. However, it might
-look overly complicated for a tool like `rustup` and is definitely hard to get
+look overly complicated for a tool like rustup and is definitely hard to get
 right.
 
 I have come to realize recently that the right design decision here is all about
 choosing a certain level of correctness to enforce. For example, my team leader
 @rbtcollins "can see the argument for read locking" here, but added the comment
-that "it's not essential" to this issue.
+that "it's not essential" to addressing this issue.
 
 What aspects of correctness do you expect a "locked rustup" to ensure, my fellow
-Rustaceans?
+Rustacean? Would you like an easy write-locking-only policy, or do you think we
+should go further than that? Is a complicated solution such as a lock server
+really worth it? Do you happen to have relevant experiences and/or suggestions
+to share? I would love to hear your thoughts on this issue.
+
+Please feel free to reach out to me via [Zulip], from the `wg-rustup` channel of
+Rust's [Discord server], or via any of the social media links on my [GitHub
+profile].
 
 [rustup#988]: https://github.com/rust-lang/rustup/issues/988
 [elan#121]: https://github.com/leanprover/elan/pull/121
 [@matklad]: https://matklad.github.io
 [`NamedLock`]: https://docs.rs/named-lock/0.4.1/named_lock/struct.NamedLock.html
+[Zulip]: https://rust-lang.zulipchat.com/#user/616990
+[Discord server]: https://discord.com/invite/rust-lang
+[GitHub profile]: https://github.com/rami3l
