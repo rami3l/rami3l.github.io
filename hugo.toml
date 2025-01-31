@@ -54,6 +54,9 @@ ShowRssButtonInSectionTermList = true
 ShowToc = true
 tocopen = true
 
+[params.assets]
+disableScrollBarStyle = true
+
 [params.homeInfoParams]
 Title = "rami3l"
 Content = """
