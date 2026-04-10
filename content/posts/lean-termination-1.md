@@ -64,9 +64,18 @@ An intuitive way of seeing how this proof is possible might be the following:
 According to the
 [docs](https://lean-lang.org/theorem_proving_in_lean4/induction_and_recursion.html#structural-recursion-and-induction),
 we are using a _structural recursion_ here, and thus it's `n`'s _structure_ that
-is decreasing. After all, `ℕ` is inductively defined:
+is decreasing. After all, `ℕ` is
+[inductively defined](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/Prelude.lean#L1038-L1044):
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/Prelude.lean#L1038-L1044" >}}
+```lean
+inductive Nat where
+  /-- `Nat.zero`, normally written `0 : Nat`, is the smallest natural number.
+  This is one of the two constructors of `Nat`. -/
+  | zero : Nat
+  /-- The successor function on natural numbers, `succ n = n + 1`.
+  This is one of the two constructors of `Nat`. -/
+  | succ (n : Nat) : Nat
+```
 
 So you can see the decrease in `n`'s structure as a decrease in the number of
 constructors (`.zero`/`.succ`) required to construct `n`.
@@ -108,10 +117,16 @@ The compiler will then try to perform step `3.` automatically, by searching for
 an implicit instance `wf : WellFounded ℕ`, and trying to conclude that `n` is
 decreasing in terms of `wf.rel`.
 
-Let's say it has found `Nat.lt_wfRel : WellFounded ℕ`, which stands for the
-well-foundedness of `Nat.lt` (i.e. the `<` operator on `ℕ`):
+Let's say it has found
+[`Nat.lt_wfRel : WellFounded ℕ`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WF.lean#L151-L153),
+which stands for the well-foundedness of `Nat.lt` (i.e. the `<` operator on
+`ℕ`):
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L151-L153" >}}
+```lean
+def lt_wfRel : WellFoundedRelation Nat where
+  rel := Nat.lt
+  wf  := by
+```
 
 Since `n < n + 1` trivially holds, the termination proof is again completed.
 
@@ -128,14 +143,28 @@ decreasing_by decreasing_tactic
 [_tactic mode_](https://lean-lang.org/theorem_proving_in_lean4/tactics.html#entering-tactic-mode),
 just like the usual `by` keyword does.
 
-This tactic is defined as follows:
+This
+[tactic](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WFTactics.lean#L52-L53)
+is defined as follows:
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L52-L53" >}}
+```lean
+macro "decreasing_tactic" : tactic =>
+  `(tactic| decreasing_with first | decreasing_trivial | subst_vars; decreasing_trivial)
+```
 
 ... and the triviality of `n < n + 1` (and many other similar arithmetic
-statements) is already included in `decreasing_trivial`:
+statements) is already included in
+[`decreasing_trivial`](https://github.com/leanprover/lean4/blob/a62d2fd4979671b76b8ab13ccbe4fdf410ec0d9d/src/Init/WFTactics.lean#L22-L28):
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L22-L28" >}}
+```lean
+syntax "decreasing_trivial" : tactic
+
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| (simp (config := { arith := true, failIfUnchanged := false })); done)
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| assumption)
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| apply Nat.sub_succ_lt_self; assumption) -- a - (i+1) < a - i if i < a
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| apply Nat.pred_lt'; assumption) -- i-1 < i if j < i
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| apply Nat.pred_lt; assumption)  -- i-1 < i if i ≠ 0
+```
 
 ## Proof by WF Recursion and `decreasing_by`
 
@@ -143,29 +172,60 @@ What if we want to write a `decreasing_by` clause by ourselves?
 
 In practice, you should try to benefit from the existing infrastructure by
 _extending_ the `decreasing_trivial` macro with an extra `macro_rules`
-declaration, as stated in the doc comments below:
+declaration, as stated in the
+[doc comments](https://github.com/leanprover/lean4/blob/a62d2fd4979671b76b8ab13ccbe4fdf410ec0d9d/src/Init/WFTactics.lean#L17-L20)
+below:
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L17-L20" >}}
+````markdown
+It can be extended by adding more macro definitions, e.g.
+
+```lean
+macro_rules | `(tactic| decreasing_trivial) => `(tactic| linarith)
+
+```
+````
 
 For the sake of the demo, let's write a similar proof by hand, but this time
-with another instance, `instWellFoundedRelation : WellFounded ℕ`:
+with another instance,
+[`instWellFoundedRelation : WellFounded ℕ`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WF.lean#L193-L194):
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L193-L194" >}}
+```lean
+instance (priority := low) [SizeOf α] : WellFoundedRelation α :=
+  sizeOfWFRel
+```
 
 > {{< details "More details on this definition" >}}
 
-`sizeOfWFRel` is defined as follows:
+[`sizeOfWFRel`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WF.lean#L190-L191)
+is defined as follows:
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L190-L191" >}}
+```lean
+abbrev sizeOfWFRel {α : Sort u} [SizeOf α] : WellFoundedRelation α :=
+  measure sizeOf
+```
 
-... and `measure` as follows:
+... with the relevant definitions of
+[`measure`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WF.lean#L187-L188),
+[`invImage`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WF.lean#L127-L129)
+and
+[`InvImage`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/Core.lean#L938-L939)
+as follows:
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L187-L188" >}}
+```lean
+abbrev measure {α : Sort u} (f : α → Nat) : WellFoundedRelation α :=
+  invImage f Nat.lt_wfRel
+```
 
-... and `invImage` as follows:
+```lean
+@[reducible] def invImage (f : α → β) (h : WellFoundedRelation β) : WellFoundedRelation α where
+  rel := InvImage h.rel f
+  wf  := InvImage.wf f h.wf
+```
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WF.lean#L127-L129" >}}
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/Core.lean#L938-L939" >}}
+```lean
+def InvImage {α : Sort u} {β : Sort v} (r : β → β → Prop) (f : α → β) : α → α → Prop :=
+  fun a₁ a₂ => r (f a₁) (f a₂)
+```
 
 All those definitions above give:
 
@@ -183,10 +243,28 @@ All those definitions above give:
 {{< /details >}}
 
 We say a type `α` is _sized_ if there is an instance of type `SizeOf α`. Here's
-how the `SizeOf` typeclass and its `sizeOf` function are introduced in the doc
-comments:
+how the `SizeOf` typeclass and its `sizeOf` function are introduced in the
+[doc comments](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/SizeOf.lean#L12-L28):
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/SizeOf.lean#L12-L28" >}}
+```lean
+/--
+`SizeOf` is a typeclass automatically derived for every inductive type,
+which equips the type with a "size" function to `Nat`.
+The default instance defines each constructor to be `1` plus the sum of the
+sizes of all the constructor fields.
+
+This is used for proofs by well-founded induction, since every field of the
+constructor has a smaller size than the constructor itself,
+and in many cases this will suffice to do the proof that a recursive function
+is only called on smaller values.
+If the default proof strategy fails, it is recommended to supply a custom
+size measure using the `termination_by` argument on the function definition.
+-/
+class SizeOf (α : Sort u) where
+  /-- The "size" of an element, a natural number which decreases on fields of
+  each inductive type. -/
+  sizeOf : α → Nat
+```
 
 In short, `instWellFoundedRelation` ensures that every sized type `α` (hence the
 implicit instance parameter `[SizeOf α]`) satisfies `WellFoundedRelation α`, in
@@ -232,20 +310,42 @@ complicated way that a few times of definition `unfold`ing turned out to be
 necessary for us to see it more clearly.
 
 Also, this _is_ the same as `n < n + 1`, since `sizeOf n = n`. This is called
-`sizeOf_nat`:
+[`sizeOf_nat`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/SizeOf.lean#L52):
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/SizeOf.lean#L52" >}}
+```lean
+@[simp] theorem sizeOf_nat (n : Nat) : sizeOf n = n := rfl
+```
 
 After applying that `theorem` to our goal, the termination proof is completed
 for the third time.
 
-As a matter of fact, `decreasing_with` is defined as follows:
+As a matter of fact,
+[`decreasing_with`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WFTactics.lean#L33-L44)
+is defined as follows:
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L33-L44" >}}
+```lean
+macro "decreasing_with " ts:tacticSeq : tactic =>
+ `(tactic|
+   (simp_wf
+    repeat (first | apply Prod.Lex.right | apply Prod.Lex.left)
+    repeat (first | apply PSigma.Lex.right | apply PSigma.Lex.left)
+    first
+    | done
+    | $ts
+    | fail "failed to prove termination, possible solutions:
+  - Use `have`-expressions to prove the remaining goals
+  - Use `termination_by` to specify a different well-founded relation
+  - Use `decreasing_by` to specify your own tactic for discharging this kind of goal"))
+```
 
-... and `simp_wf` as follows:
+... and
+[`simp_wf`](https://github.com/leanprover/lean4/blob/a62d2fd/src/Init/WFTactics.lean#L12-L13)
+as follows:
 
-{{< emgithub owner=leanprover repo=lean4 branch="a62d2fd" file="src/Init/WFTactics.lean#L12-L13" >}}
+```lean
+macro "simp_wf" : tactic =>
+  `(tactic| try simp [invImage, InvImage, Prod.lex, sizeOfWFRel, measure, Nat.lt_wfRel, WellFoundedRelation.rel])
+```
 
 Thanks to these carefully-written definitions, many recursions can be
 automatically proven to be "decreasing" with just the default

@@ -124,9 +124,29 @@ allows the use of FRP (Functional Reactive Programming) on
 
 From here, things should become much easier...
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/Observers.swift#L9-L25" >}}
+```swift
+let currentInputSourceObserver = DistributedNotificationCenter
+  .default
+  .publisher(for: kTISNotifySelectedKeyboardInputSourceChanged as Notification.Name)
+  .map { _ in getInputSource() }
+  .removeDuplicates()
+  .sink { inputSource in
+    guard let currentApp = getCurrentAppBundleID() else {
+      log.warning(
+        "currentInputSourceObserver: failed to get current app bundle ID for notification"
+      )
+      return
+    }
+    log.debug(
+      "currentInputSourceObserver: updating input source for `\(currentApp)` to: \(inputSource)"
+    )
+    saveInputSource(inputSource, forApp: currentApp)
+  }
+```
 
-The code is as readable as it gets if you are familiar with FRP:
+The
+[code](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/Observers.swift#L9-L25)
+is as readable as it gets if you are familiar with FRP:
 
 - `.publisher()`: We are processing the stream of input source change events.
   Whenever this happens, a `kTISNotifySelectedKeyboardInputSourceChanged`
@@ -149,9 +169,15 @@ change?
 
 `NSWorkspace.shared` has a `frontmostApplication` field, the changes of which
 are even observable. Thus, it is very tempting to get the app bundle ID directly
-from there:
+from there like
+[this](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/AppUtils.swift#L35-L38):
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/AppUtils.swift#L35-L38" >}}
+```swift
+func getFrontmostAppBundleID() -> String? {
+  let runningApp = NSWorkspace.shared.frontmostApplication
+  return runningApp?.bundleIdentifier
+}
+```
 
 ... except it doesn't work all the time.
 
@@ -214,19 +240,53 @@ APIs looks quite like the Objective-C snippet in the
 [Detecting Input Source Changes](#detecting-input-source-changes) section, but
 this time, I'm writing all of this in Swift rather than in C.
 
-The first thing to do is to declare `WindowChangeObserver` as a subclass of
-`NSObject`:
+The first thing to do is to declare
+[`WindowChangeObserver`](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/WindowChangeObserver.swift#L4-L15)
+as a subclass of `NSObject`:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/WindowChangeObserver.swift#L4-L15" >}}
+```swift
+class WindowChangeObserver: NSObject {
+  var currentAppPID: pid_t
+  var element: AXUIElement
+  var rawObserver: AXObserver?
+
+  let notifNames =
+    [
+      kAXFocusedWindowChangedNotification:
+        Claveilleur.focusedWindowChangedNotification,
+      kAXApplicationHiddenNotification:
+        Claveilleur.appHiddenNotification,
+    ] as [CFString: Notification.Name]
+```
 
 The `notifNames` mapping here not only gives the two types of messages that we
 care about, but also helps convert `kAX*` messages to regular
 `Notification.Name`, so that we can send them to a `NotificationCenter` and
 handle them in the "old" way.
 
-Next, we declare the callback for the observer:
+Next, we declare the
+[callback](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/WindowChangeObserver.swift#L17-L33)
+for the observer:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/WindowChangeObserver.swift#L17-L33" >}}
+```swift
+let observerCallbackWithInfo: AXObserverCallbackWithInfo = {
+  (observer, element, notif, userInfo, refcon) in
+  guard let refcon = refcon else {
+    return
+  }
+  let slf = Unmanaged<WindowChangeObserver>.fromOpaque(refcon).takeUnretainedValue()
+  log.debug("WindowChangeObserver: received \(notif) from \(slf.currentAppPID)")
+
+  guard let notifName = slf.notifNames[notif] else {
+    log.warning("WindowChangeObserver: unknown notification `\(notif)` detected")
+    return
+  }
+  localNotificationCenter.post(
+    name: notifName,
+    object: slf.currentAppPID
+  )
+}
+```
 
 We need to remember that Carbon is a C-based framework, so naturally we are
 declaring a C-compatible callback above. That is to say, despite being written
@@ -238,63 +298,224 @@ However, apart from this restriction, what the callback does is still quite
 clear: it simply sends the converted `Notification.Name` to
 `localNotificationCenter`.
 
-The implementation of `init` and `deinit` methods is quite boring, since they do
-almost nothing other than initializing and deinitializing `rawObserver`
-respectively:
+The implementation of
+[`init`](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/WindowChangeObserver.swift#L35-L56)
+and
+[`deinit`](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/WindowChangeObserver.swift#L58-L69)
+methods are quite boring, since they do almost nothing other than initializing
+and deinitializing `rawObserver` respectively:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/WindowChangeObserver.swift#L35-L69" >}}
+```swift
+init(pid: pid_t) throws {
+  currentAppPID = pid
+  element = AXUIElementCreateApplication(currentAppPID)
+  super.init()
 
-... where `.unwrap()` is just a convenience method to convert `AXError`s to
-exceptions and throw them.
+  try AXObserverCreateWithInfoCallback(
+    currentAppPID,
+    observerCallbackWithInfo,
+    &rawObserver
+  )
+  .unwrap()
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/AXError%2BExtensions.swift#L3-L13" >}}
+  let selfPtr = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+  try notifNames.keys.forEach {
+    try AXObserverAddNotification(rawObserver!, element, $0, selfPtr).unwrap()
+  }
+  CFRunLoopAddSource(
+    CFRunLoopGetCurrent(),
+    AXObserverGetRunLoopSource(rawObserver!),
+    CFRunLoopMode.defaultMode
+  )
+}
+```
+
+```swift
+deinit {
+  CFRunLoopRemoveSource(
+    CFRunLoopGetCurrent(),
+    AXObserverGetRunLoopSource(rawObserver!),
+    CFRunLoopMode.defaultMode
+  )
+  notifNames.keys.forEach {
+    do {
+      try AXObserverRemoveNotification(rawObserver!, element, $0).unwrap()
+    } catch {}
+  }
+}
+```
+
+... where
+[`.unwrap()`](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/AXError%2BExtensions.swift#L3-L13)
+is just a convenience method to convert `AXError`s to exceptions and throw them.
+
+```swift
+extension AXError {
+  /// Throws a conventional runtime error if this `AXError` is not `.success`.
+  func unwrap() throws {
+    guard case .success = self else {
+      throw AXUIError.axError("AXUI function failed with `\(self)`")
+    }
+  }
+}
+```
 
 #### Tracking the Interesting PIDs
 
 This time, let's maintain a collection of `WindowChangeObserver`s for each
 useful PID in the `RunningAppsObserver` class.
 
-As usual, `RunningAppsObserver` should be declared as a subclass of `NSObject`:
+As usual,
+[`RunningAppsObserver`](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/RunningAppsObserver.swift#L3-L11)
+should be declared as a subclass of `NSObject`:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/RunningAppsObserver.swift#L3-L11" >}}
+```swift
+class RunningAppsObserver: NSObject {
+  @objc var currentWorkSpace: NSWorkspace
+  var rawObserver: NSKeyValueObservation?
 
-Here, `rawObserver` will be initialized to an Objective-C key-value observation
-of `currentWorkSpace.runningApplications`, which is responsible for maintaining
-the `windowChangeObservers` collection by repeatedly calculating the latest
-changes in the observed collection of running apps:
+  var windowChangeObservers = [pid_t: WindowChangeObserver?]()
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/RunningAppsObserver.swift#L13-L45" >}}
+  convenience override init() {
+    self.init(workspace: NSWorkspace.shared)
+  }
+```
+
+Here, `rawObserver` will be
+[initialized](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/RunningAppsObserver.swift#L13-L45)
+to an Objective-C key-value observation of
+`currentWorkSpace.runningApplications`, which is responsible for maintaining the
+`windowChangeObservers` collection by repeatedly calculating the latest changes
+in the observed collection of running apps:
+
+```swift
+init(workspace: NSWorkspace) {
+  currentWorkSpace = workspace
+  windowChangeObservers =
+    Dictionary(
+      uniqueKeysWithValues:
+        Self.getWindowChangePIDs(for: currentWorkSpace)
+        .map { ($0, try? WindowChangeObserver(pid: $0)) }
+    )
+  super.init()
+
+  rawObserver = currentWorkSpace.observe(\.runningApplications) {
+    workspace,
+    _ in
+    let oldKeys = Set(self.windowChangeObservers.keys)
+    let newKeys = Self.getWindowChangePIDs(for: workspace)
+
+    let toRemove = oldKeys.subtracting(newKeys)
+    if !toRemove.isEmpty {
+      log.debug("RunningAppsObserver: removing from windowChangeObservers: \(toRemove)")
+    }
+    toRemove.forEach {
+      self.windowChangeObservers.removeValue(forKey: $0)
+    }
+
+    let toAdd = newKeys.subtracting(oldKeys)
+    if !toAdd.isEmpty {
+      log.debug("RunningAppsObserver: adding to windowChangeObservers: \(toAdd)")
+    }
+    toAdd.forEach {
+      self.windowChangeObservers[$0] = try? WindowChangeObserver(pid: $0)
+    }
+  }
+}
+```
 
 Finally, thanks to the directions of
 [this Python snippet](https://gist.github.com/ljos/3040846), we can use
 [Quartz Window Services](https://developer.apple.com/documentation/coregraphics/quartz_window_services)
-[^3] to obtain the collection of "interesting" PIDs ("interesting" as in "having
-a GUI"):
+[^3] to
+[obtain](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/RunningAppsObserver.swift#L47-L63)
+the collection of "interesting" PIDs ("interesting" as in "having a GUI"):
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/RunningAppsObserver.swift#L47-L63" >}}
+```swift
+static func getWindowChangePIDs(
+  for workspace: NSWorkspace
+) -> Set<pid_t> {
+  // https://apple.stackexchange.com/a/317705
+  // https://gist.github.com/ljos/3040846
+  // https://stackoverflow.com/a/61688877
+  let includingWindowAppPIDs =
+    (CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID)!
+    as Array)
+    .compactMap { $0.object(forKey: kCGWindowOwnerPID) as? pid_t }
 
-To this point, we have finally obtained an observer that can detect current
-window changes from an automatically-adjusted range of PIDs and send
+  return Set(
+    workspace.runningApplications.lazy
+      .map { $0.processIdentifier }
+      .filter { includingWindowAppPIDs.contains($0) }
+  )
+}
+```
+
+To this point, we have finally
+[obtained](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/Observers.swift#L63)
+an observer that can detect current window changes from an
+automatically-adjusted range of PIDs and send
 `Claveilleur.focusedWindowChangedNotification` or
 `Claveilleur.appHiddenNotification` messages to `localNotificationCenter`
 accordingly:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/Observers.swift#L63" >}}
+```swift
+let runningAppsObserver = RunningAppsObserver()
+```
 
 #### Consuming the Messages
 
 After all the above efforts, we can finally return to the familiar FRP-style
 APIs.
 
-First, we have a bunch of different bundle ID-generating publishers, all likely
-to indicate a new current app:
+First, we have a bunch of different bundle ID-generating
+[publishers](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/Observers.swift#L27-L41),
+all likely to indicate a new current app:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/Observers.swift#L27-L41" >}}
+```
+let focusedWindowChangedPublisher =
+  localNotificationCenter
+  .publisher(for: Claveilleur.focusedWindowChangedNotification)
+  .compactMap { getAppBundleID(forPID: $0.object as! pid_t) }
 
-Then, all we need to do is to declare another observer that consumes all those
-publishers, and saves or loads input sources according to the current app:
+let didActivateAppPublisher = NSWorkspace
+  .shared
+  .notificationCenter
+  .publisher(for: NSWorkspace.didActivateApplicationNotification)
+  .compactMap(getAppBundleID(forNotification:))
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/Observers.swift#L43-L61" >}}
+let appHiddenPublisher =
+  localNotificationCenter
+  .publisher(for: Claveilleur.appHiddenNotification)
+  .compactMap { _ in getCurrentAppBundleID() }
+```
+
+Then, all we need to do is to declare another
+[observer](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/Observers.swift#L43-L61)
+that consumes all those publishers, and saves or loads input sources according
+to the current app:
+
+```swift
+let appActivatedObserver =
+  focusedWindowChangedPublisher
+  .merge(with: didActivateAppPublisher, appHiddenPublisher)
+  .removeDuplicates()
+  .sink { currentApp in
+    log.debug("appActivatedObserver: detected activation of app: \(currentApp)")
+
+    guard
+      let oldInputSource = loadInputSource(forApp: currentApp),
+      setInputSource(to: oldInputSource)
+    else {
+      let newInputSource = getInputSource()
+      log.info(
+        "appActivatedObserver: registering input source for `\(currentApp)` as: \(newInputSource)"
+      )
+      saveInputSource(newInputSource, forApp: currentApp)
+      return
+    }
+  }
+```
 
 #### Getting the Current App
 
@@ -324,24 +545,55 @@ However, when running this build on ARM-based Macs, it seemed that the
 Accessibility Privileges can never be granted
 ([Claveilleur/#2](https://github.com/rami3l/Claveilleur/issues/2)).
 
-That is, the following function always returns `false`:
+That is, the following
+[function](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Sources/Privilege.swift#L5-L8)
+always returns `false`:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Sources/Privilege.swift#L5-L8" >}}
+```swift
+func hasAXPrivilege() -> Bool {
+  let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): kCFBooleanTrue] as CFDictionary
+  return AXIsProcessTrustedWithOptions(options)
+}
+```
 
 As it turns out, this has something to do with the code signing rules that macOS
 is enforcing. It just so happens that when the app is not a macOS bundle,
 [it could be very hard get it signed correctly](https://www.smileykeith.com/2021/10/05/codesign-m1).
 
 I solved this problem by first creating a minimal bundle manifest under
-`Supporting/Info.plist`:
+[`Supporting/Info.plist`](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Supporting/Info.plist):
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Supporting/Info.plist" >}}
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>CFBundleIdentifier</key>
+        <string>io.github.rami3l.Claveilleur</string>
+        <key>CFBundleShortVersionString</key>
+        <string>0.1.0</string>
+        <key>CFBundlePackageType</key>
+        <string>BNDL</string>
+        <key>NSHumanReadableCopyright</key>
+        <string>Copyright © 2023 rami3l. All rights reserved.</string>
+    </dict>
+</plist>
+```
 
 ... then embedding the manifest into the executable [^5] by adding
-`linkerSettings` to the `.executableTarget()` section in `Package.swift` like
-so:
+`linkerSettings` to the `.executableTarget()` section in
+[`Package.swift`](https://github.com/rami3l/Claveilleur/blob/0a5e8d2/Package.swift#L40-L46)
+like so:
 
-{{< emgithub owner=rami3l repo=Claveilleur branch="0a5e8d2" file="Package.swift#L40-L46" >}}
+```swift
+linkerSettings: [
+  .unsafeFlags([
+    "-Xlinker", "-sectcreate",
+    "-Xlinker", "__TEXT",
+    "-Xlinker", "__info_plist",
+    "-Xlinker", "Supporting/Info.plist",
+  ])
+```
 
 ... and just to be sure, signing the CI build again before publishing:
 
