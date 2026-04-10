@@ -7,4 +7,3 @@ To preview the site locally with `hugo`, run:
 ```console
 > hugo server -D
 ```
-
