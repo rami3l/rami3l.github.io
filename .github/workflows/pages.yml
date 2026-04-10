@@ -29,16 +29,23 @@ jobs:
           submodules: true # Fetch Hugo themes (true OR recursive)
           fetch-depth: 0 # Fetch all history for .GitInfo and .Lastmod
 
-      - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v3
+      - uses: pnpm/action-setup@v5
         with:
-          hugo-version: "latest"
-          # extended: true
+          version: latest
+
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          cache-dependency-path: "**/pnpm-lock.yaml"
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Check format
+        run: pnpm fmt --check
 
       - name: Build
-        run: |
-          hugo mod get -u ./...
-          hugo --minify
+        run: pnpm build --minify
 
       # TODO: Check links?
 

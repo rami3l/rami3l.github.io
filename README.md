@@ -2,8 +2,14 @@
 
 ## Quick Start
 
-To preview the site locally with `hugo`, run:
+The first thing to do is to install the dependencies:
 
 ```console
-> hugo server -D
+> pnpm install
+```
+
+To preview the site locally, run:
+
+```console
+> pnpm dev
 ```
