@@ -1,0 +1,18 @@
+{
+  "name": "rami3l.github.io",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "fmt": "oxfmt .",
+    "build": "hugo",
+    "dev": "hugo server -D",
+    "serve": "hugo server"
+  },
+  "keywords": [],
+  "author": "",
+  "devDependencies": {
+    "hugo-bin": "^0.149.2",
+    "oxfmt": "^0.44.0"
+  }
+}
