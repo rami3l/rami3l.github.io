@@ -50,7 +50,7 @@ jobs:
       # TODO: Check links?
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         if: github.ref == 'refs/heads/master'
         with:
           path: ./public
