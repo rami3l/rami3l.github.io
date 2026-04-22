@@ -45,7 +45,7 @@ jobs:
         run: pnpm fmt --check
 
       - name: Build
-        run: pnpm build --minify
+        run: pnpm build
 
       # TODO: Check links?
 
@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         if: github.ref == 'refs/heads/master'
         with:
-          path: ./public
+          path: ./dist
 
   deploy:
     environment:
