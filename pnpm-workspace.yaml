@@ -1,2 +1,3 @@
 allowBuilds:
-  hugo-bin: true
+  esbuild: true
+  sharp: true
