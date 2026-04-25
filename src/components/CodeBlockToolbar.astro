@@ -1,0 +1,62 @@
+<script is:inline>
+  document.addEventListener("DOMContentLoaded", () => {
+    let wrapEnabled = false;
+
+    function applyWrapState() {
+      let codeBlocks = document.querySelectorAll("pre.astro-code");
+      let wrapButtons = document.querySelectorAll("[data-code-wrap-toggle]");
+
+      for (let block of codeBlocks) {
+        block.classList.toggle("no-wrap", !wrapEnabled);
+      }
+
+      for (let button of wrapButtons) {
+        button.innerText = wrapEnabled ? "unwrap" : "wrap";
+        button.setAttribute("aria-pressed", wrapEnabled ? "true" : "false");
+      }
+    }
+
+    document.addEventListener("click", async (event) => {
+      let target = event.target;
+      if (!(target instanceof Element)) return;
+
+      let wrapButton = target.closest("[data-code-wrap-toggle]");
+      if (wrapButton instanceof HTMLButtonElement) {
+        wrapEnabled = !wrapEnabled;
+        applyWrapState();
+        return;
+      }
+
+      let copyButton = target.closest("[data-code-copy]");
+      if (!(copyButton instanceof HTMLButtonElement)) return;
+
+      let wrapper = copyButton.closest(".code-block");
+      if (!(wrapper instanceof HTMLDivElement)) return;
+
+      let codeBlock = wrapper.querySelector("pre.astro-code");
+      if (!(codeBlock instanceof HTMLElement)) return;
+
+      await copyCode(codeBlock, copyButton);
+    });
+
+    applyWrapState();
+
+    async function copyCode(block, button) {
+      let code = block.querySelector("code");
+      if (!code) return;
+
+      let text = code.innerText;
+
+      await navigator.clipboard.writeText(text);
+
+      let oldLabel = button.innerText;
+      button.innerText = "copied";
+      button.classList.add("code-action-copied");
+
+      setTimeout(() => {
+        button.innerText = oldLabel;
+        button.classList.remove("code-action-copied");
+      }, 2000);
+    }
+  });
+</script>

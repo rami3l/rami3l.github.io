@@ -10,7 +10,7 @@ import {
 } from "../config.ts";
 import ThemeToggle from "./ThemeToggle.astro";
 import HeaderLink from "./HeaderLink.astro";
-import CodeCopyButton from "./CodeCopyButton.astro";
+import CodeBlockToolbar from "./CodeBlockToolbar.astro";
 
 import CommandPalette from "./search/CommandPalette.svelte";
 import Search from "./search/Search.svelte";
@@ -56,4 +56,4 @@ const { active } = Astro.props;
 </header>
 
 <CommandPalette client:load />
-<CodeCopyButton />
+<CodeBlockToolbar />

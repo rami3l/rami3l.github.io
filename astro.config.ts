@@ -3,6 +3,7 @@ import { defineConfig } from "astro/config";
 import { resolve } from "path";
 import remarkMath from "remark-math";
 import rehypeMathjax from "rehype-mathjax";
+import rehypeCodeBlockToolbar from "./src/plugins/rehype-code-block-toolbar.js";
 
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
@@ -50,7 +51,10 @@ export default defineConfig({
     customEmbeds({
       embeds: [ExcalidrawEmbed, YoutubeEmbed, LinkCardEmbed],
     }),
-    mdx(),
+    mdx({
+      remarkPlugins: [remarkMath],
+      rehypePlugins: [rehypeMathjax, rehypeCodeBlockToolbar],
+    }),
     sitemap(),
     tailwind(),
     svelte(),
@@ -75,7 +79,7 @@ export default defineConfig({
     },
 
     remarkPlugins: [remarkMath],
-    rehypePlugins: [rehypeMathjax],
+    rehypePlugins: [rehypeMathjax, rehypeCodeBlockToolbar],
     remarkRehype: {
       footnoteBackContent: "↩︎",
     },

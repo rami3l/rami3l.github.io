@@ -35,19 +35,54 @@ const { title, description } = Astro.props;
         color: var(--shiki-light);
       }
 
-      pre {
-        @apply overflow-hidden !important;
-        @apply border border-base-300 dark:border-base-700 bg-base-200/50 dark:bg-base-950/30 rounded-xl !important;
+      pre.astro-code {
+        @apply overflow-x-auto rounded-xl !important;
+        @apply border border-base-300 dark:border-base-700 bg-base-200/50 dark:bg-base-950/30 !important;
       }
 
-      .line.highlighted {
-        margin: 0 -24px;
-        padding: 0 24px;
-        position: relative;
-
-        display: inline-block;
-        width: calc(100% + 48px);
+      .code-block {
+        @apply my-8 rounded-xl border border-base-300 dark:border-base-700 overflow-hidden;
+        @apply bg-base-200/50 dark:bg-base-950/30;
       }
+
+      .code-block > pre.astro-code {
+        @apply m-0 rounded-none border-0 !important;
+        background: transparent !important;
+      }
+
+      .code-block-toolbar {
+        @apply flex items-center justify-between gap-3 px-4 py-2 border-b border-base-300 dark:border-base-700;
+        @apply bg-base-100/80 dark:bg-base-900/70;
+      }
+
+      .code-block-meta {
+        @apply flex items-center gap-2 text-xs text-base-600 dark:text-base-400;
+      }
+
+      .code-language {
+        @apply uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full;
+        @apply bg-base-200 dark:bg-base-800 text-base-700 dark:text-base-200;
+      }
+
+      .code-block-actions {
+        @apply flex items-center gap-2;
+      }
+
+      .code-action {
+        @apply text-xs px-2.5 py-1 rounded-md border border-base-300 dark:border-base-700;
+        @apply bg-base-100 dark:bg-base-900 text-base-700 dark:text-base-200;
+        @apply hover:bg-base-200 dark:hover:bg-base-800 transition-colors;
+      }
+
+      .code-action-copied {
+        @apply bg-green-200 dark:bg-green-900 border-green-300 dark:border-green-700 text-green-800 dark:text-green-300;
+      }
+
+      pre.astro-code.no-wrap {
+        white-space: pre !important;
+        word-wrap: normal !important;
+      }
+
       .line.highlighted {
         @apply bg-accent-500/10 dark:bg-accent-700/10;
       }
