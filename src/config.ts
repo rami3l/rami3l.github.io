@@ -30,10 +30,10 @@ export const LICENSE = "All rights reserved.";
 export const SOURCE_LINK = "https://github.com/rami3l/rami3l.github.io";
 
 // will be used to set the base color of the blog
-export const BASE_COLOR: BaseColor = "neutral";
+export const BASE_COLOR: BaseColor = "stone";
 
 // will be used to set the accent color of the blog
-export const ACCENT_COLOR: AccentColor = "cyan";
+export const ACCENT_COLOR: AccentColor = "emerald";
 
 // will show all icons that are not empty in the footer as links
 export const SOCIAL_LINKS: {
