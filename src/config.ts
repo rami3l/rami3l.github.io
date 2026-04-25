@@ -39,6 +39,7 @@ export const ACCENT_COLOR: AccentColor = "cyan";
 export const SOCIAL_LINKS: {
   FACEBOOK_URL?: string;
   TWITTER_URL?: string;
+  MASTODON_URL?: string;
   GITHUB_URL?: string;
   INSTAGRAM_URL?: string;
   LINKEDIN_URL?: string;
@@ -49,6 +50,7 @@ export const SOCIAL_LINKS: {
   SHOW_RSS?: boolean;
 } = {
   SHOW_RSS: true,
+  MASTODON_URL: "https://hachyderm.io/@rami3l",
   GITHUB_URL: "https://github.com/rami3l",
 };
 
