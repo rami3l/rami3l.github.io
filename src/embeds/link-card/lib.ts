@@ -1,7 +1,8 @@
-import { safeGetDOM } from "@astro-community/astro-embed-utils";
+import { makeSafeGetter } from "@astro-community/astro-embed-utils";
+import { load } from "cheerio";
 
-/** Helper to get the `content` attribute of an element. */
-const getContent = (el: Element | null) => el?.getAttribute("content");
+const safeGetDOM = makeSafeGetter(async (res) => load(await res.text()));
+
 /** Helper to filter out insecure or non-absolute URLs. */
 const urlOrNull = (url: string | null | undefined) =>
   url?.slice(0, 8) === "https://" ? url : null;
@@ -11,16 +12,15 @@ const urlOrNull = (url: string | null | undefined) =>
  * @param pageUrl URL to parse
  */
 export async function parseOpenGraph(pageUrl: string) {
-  const html = await safeGetDOM(pageUrl);
-  if (!html) return;
+  const $ = await safeGetDOM(pageUrl);
+  if (!$) return;
 
   const getMetaProperty = (prop: string) =>
-    getContent(html.querySelector(`meta[property=${JSON.stringify(prop)}]`));
+    $(`meta[property=${JSON.stringify(prop)}]`).attr("content") ?? null;
   const getMetaName = (name: string) =>
-    getContent(html.querySelector(`meta[name=${JSON.stringify(name)}]`));
+    $(`meta[name=${JSON.stringify(name)}]`).attr("content") ?? null;
 
-  const title =
-    getMetaProperty("og:title") || html.querySelector("title")?.textContent;
+  const title = getMetaProperty("og:title") || $("title").text() || null;
   const description =
     getMetaProperty("og:description") || getMetaName("description");
   const image = urlOrNull(
@@ -37,8 +37,7 @@ export async function parseOpenGraph(pageUrl: string) {
   const videoType = getMetaProperty("og:video:type");
   const url =
     urlOrNull(
-      getMetaProperty("og:url") ||
-        html.querySelector("link[rel='canonical']")?.getAttribute("href"),
+      getMetaProperty("og:url") || $("link[rel='canonical']").attr("href"),
     ) || pageUrl;
 
   return { title, description, image, imageAlt, url, video, videoType };
