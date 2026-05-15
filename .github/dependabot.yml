@@ -10,10 +10,10 @@ updates:
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "gomod"
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     groups:
       minors:
         update-types:
