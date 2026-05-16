@@ -6,9 +6,9 @@ import rehypeMathjax from "rehype-mathjax";
 
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
-import tailwind from "@astrojs/tailwind";
 import svelte from "@astrojs/svelte";
 import { pagefind } from "vite-plugin-pagefind";
+import tailwindcss from "@tailwindcss/vite";
 
 import { BASE, SITE } from "./src/config.ts";
 
@@ -38,7 +38,7 @@ export default defineConfig({
     ssr: {
       noExternal: [BASE + "/pagefind/pagefind.js"],
     },
-    plugins: [...pagefind({ outputDirectory: "dist" })],
+    plugins: [tailwindcss(), ...pagefind({ outputDirectory: "dist" })],
     build: {
       rollupOptions: {
         external: [BASE + "/pagefind/pagefind.js"],
@@ -52,7 +52,6 @@ export default defineConfig({
     }),
     mdx(),
     sitemap(),
-    tailwind(),
     svelte(),
   ],
 
