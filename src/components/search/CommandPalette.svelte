@@ -124,15 +124,14 @@
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto p-4 pt-20 md:p-20">
       <button
         on:click={() => ($showSearch = false)}
-        class="fixed inset-0 bg-base-500/30 dark:bg-base-950/70 transition-opacity z-0 cursor-default backdrop-blur-sm"
-      >
-        <div class="sr-only">hide search</div>
-      </button>
+        class="fixed inset-0 bg-base-500/20 dark:bg-base-950/70 transition-opacity z-0 cursor-default backdrop-blur-sm"
+        aria-label="hide search"
+      ></button>
 
       <div
-        class="mx-auto max-w-xl transform divide-y divide-base-100 dark:divide-white/10 overflow-hidden rounded-xl bg-white dark:bg-base-900 shadow-2xl ring-1 ring-black dark:ring-white/20 ring-opacity-5 transition-all"
+        class="relative z-10 mx-auto max-w-xl transform divide-y divide-base-100 dark:divide-white/10 overflow-hidden rounded-xl bg-white dark:bg-base-900 shadow-2xl ring-1 ring-black dark:ring-white/20 ring-opacity-5 transition-all"
       >
-        <div class="relative flex flex-grow items-stretch focus-within:z-10">
+        <div class="relative flex grow items-stretch focus-within:z-10">
           <input
             on:keydown={(event) => {
               if (event.key == "Enter") {
