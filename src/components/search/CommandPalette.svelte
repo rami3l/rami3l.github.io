@@ -1,15 +1,17 @@
 <script lang="ts">
-  import { BASE } from "../../config.ts";
+import { BASE } from "../../config.ts";
+import type { Snippet } from "svelte";
 
-  import { fade, slide } from "svelte/transition";
-  import type { Pagefind } from "vite-plugin-pagefind/types";
-  import { showSearch } from "./CommandPaletteStore";
+import { fade, slide } from "svelte/transition";
+import type { Pagefind } from "vite-plugin-pagefind/types";
+import { showSearch } from "./CommandPaletteStore";
 
-  export let showResults = true;
+type SearchResult = { title: string; content: string; href: string };
 
-  export let placeholder = "Search...";
-
-  export let results: { title: string; content: string; href: string }[] = [
+let {
+  showResults = $bindable(true),
+  placeholder = "Search...",
+  results = $bindable([
     {
       title: "Title",
       content:
@@ -17,93 +19,101 @@
       href: "/",
     },
     { title: "Title", content: "Content", href: "/" },
-  ];
+  ]),
+  noResults = "No results found",
+  value = $bindable(""),
+  icon,
+  children,
+}: {
+  showResults?: boolean;
+  placeholder?: string;
+  results?: SearchResult[];
+  noResults?: string;
+  value?: string;
+  icon?: Snippet;
+  children?: Snippet;
+} = $props();
 
-  export let noResults = "No results found";
+let currentSelection = $state(0);
 
-  let currentSelection = 0;
+let pagefind: Pagefind | undefined;
+let input = $state<HTMLInputElement | undefined>(undefined);
 
-  let search = async () => {
-    if (value.trim() == "") return;
+const search = async () => {
+  if (!pagefind || value.trim() === "") return;
 
-    const search = await pagefind.debouncedSearch(value);
-    if (!search) return;
+  const pagefindResults = (await pagefind.debouncedSearch(value)).results;
 
-    showResults = true;
-    results = [];
+  showResults = true;
+  results = [];
 
-    let newResults = [];
+  const newResults: SearchResult[] = [];
 
-    for (let i = 0; i < search.results.length && i < 5; i++) {
-      let result = await search.results[i].data();
+  for (let i = 0; i < pagefindResults.length && i < 5; i++) {
+    const result = await pagefindResults[i].data();
 
-      let excerpt = result.excerpt;
-      // replace <mark> tags with <span class="bg-pink-600/10">
-      excerpt = excerpt.replaceAll(
-        "<mark>",
-        '<span class="bg-accent-500/20 rounded-md p-0.5">'
-      );
-      excerpt = excerpt.replaceAll("</mark>", "</span>");
+    let excerpt = result.excerpt;
+    // replace <mark> tags with <span class="bg-pink-600/10">
+    excerpt = excerpt.replaceAll(
+      "<mark>",
+      '<span class="bg-accent-500/20 rounded-md p-0.5">',
+    );
+    excerpt = excerpt.replaceAll("</mark>", "</span>");
 
-      newResults[i] = {
-        title: result.meta.title,
-        content: excerpt,
-        href: result.url,
-      };
-    }
-
-    results = Object.values(newResults);
-  };
-
-  export let value: string = "";
-
-  export const show = () => {
-    $showSearch = true;
-    setTimeout(() => {
-      input.focus();
-    }, 200);
-  };
-
-  let pagefind: Pagefind;
-  async function setupSearch() {
-    try {
-      // @ts-ignore
-      pagefind = await import(/* @vite-ignore */
-        BASE + "/pagefind/pagefind.js"
-      );
-    } catch (error) {
-      console.error("Pagefind module not found, will retry after build");
-    }
+    newResults[i] = {
+      title: result.meta.title,
+      content: excerpt,
+      href: result.url,
+    };
   }
 
-  setupSearch();
+  results = Object.values(newResults);
+};
 
-  let input: HTMLInputElement;
+export const show = () => {
+  $showSearch = true;
+  setTimeout(() => input?.focus(), 200);
+};
 
-  $: if (value.trim() == "") {
+async function setupSearch() {
+  try {
+    // @ts-ignore
+    pagefind = await import(/* @vite-ignore */ BASE + "/pagefind/pagefind.js");
+    // If there is already a query before pagefind is even loaded, search immediately.
+    if (value.trim() !== "") await search();
+  } catch (error) {
+    console.error("Pagefind module not found, will retry after build");
+  }
+}
+
+setupSearch();
+
+$effect(() => {
+  if (value.trim() === "") {
     results = [];
     showResults = false;
-  } else {
-    search();
+    return;
   }
 
-  $: if ($showSearch) {
+  search();
+});
+
+$effect(() => {
+  if ($showSearch) {
     currentSelection = 0;
-
-    setTimeout(() => {
-      input.focus();
-    }, 200);
-  } else {
-    value = "";
+    setTimeout(() => input?.focus(), 200);
+    return;
   }
+
+  value = "";
+});
 </script>
 
 <svelte:window
-  on:keydown={(event) => {
+  onkeydown={(event) => {
     // show/hide on command + k
-    if (event.key == "k" && event.metaKey) {
+    if (event.key === "k" && event.metaKey) {
       $showSearch = !$showSearch;
-
       event.preventDefault();
     }
 
@@ -123,7 +133,7 @@
   >
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto p-4 pt-20 md:p-20">
       <button
-        on:click={() => ($showSearch = false)}
+        onclick={() => ($showSearch = false)}
         class="fixed inset-0 bg-base-500/20 dark:bg-base-950/70 transition-opacity z-0 cursor-default backdrop-blur-sm"
         aria-label="hide search"
       ></button>
@@ -133,9 +143,9 @@
       >
         <div class="relative flex grow items-stretch focus-within:z-10">
           <input
-            on:keydown={(event) => {
-              if (event.key == "Enter") {
-                if (value.trim() == "") {
+            onkeydown={(event) => {
+              if (event.key === "Enter") {
+                if (value.trim() === "") {
                   $showSearch = false;
                 }
 
@@ -151,12 +161,12 @@
               }
 
               // on arrow down
-              if (event.key == "ArrowDown") {
+              if (event.key === "ArrowDown") {
                 currentSelection++;
                 if (currentSelection >= results.length) currentSelection = 0;
               }
               // on arrow up
-              if (event.key == "ArrowUp") {
+              if (event.key === "ArrowUp") {
                 currentSelection--;
                 if (currentSelection < 0) currentSelection = results.length - 1;
               }
@@ -171,13 +181,15 @@
             bind:this={input}
           />
           <button
-            on:click={() => {
+            onclick={() => {
               search();
             }}
             type="button"
             class="relative -ml-px inline-flex items-center gap-x-1.5 rounded-r-md px-3 py-2 text-sm font-semibold text-base-900 dark:bg-base-900 dark:hover:bg-base-800 hover:bg-base-50"
           >
-            <slot named="icon">
+            {#if icon}
+              {@render icon()}
+            {:else}
               <svg
                 class=" h-5 w-5 text-base-400"
                 viewBox="0 0 20 20"
@@ -190,13 +202,13 @@
                   clip-rule="evenodd"
                 />
               </svg>
-            </slot>
-            <slot />
+            {/if}
+            {@render children?.()}
           </button>
         </div>
 
         <!-- Results, show/hide based on command palette state -->
-        {#if showResults && value.trim() != ""}
+        {#if showResults && value.trim() !== ""}
           <div transition:slide={{ duration: 100 }}>
             {#if results.length > 0}
               <div
