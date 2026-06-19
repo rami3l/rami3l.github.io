@@ -1,112 +1,114 @@
 <script lang="ts">
-import { BASE } from "../../config.ts";
-import type { Snippet } from "svelte";
+  import { BASE } from "../../config.ts";
+  import type { Snippet } from "svelte";
 
-import { fade, slide } from "svelte/transition";
-import type { Pagefind } from "vite-plugin-pagefind/types";
-import { showSearch } from "./CommandPaletteStore";
+  import { fade, slide } from "svelte/transition";
+  import type { Pagefind } from "vite-plugin-pagefind/types";
+  import { showSearch } from "./CommandPaletteStore";
 
-type SearchResult = { title: string; content: string; href: string };
+  type SearchResult = { title: string; content: string; href: string };
 
-let {
-  showResults = $bindable(true),
-  placeholder = "Search...",
-  results = $bindable([
-    {
-      title: "Title",
-      content:
-        "This is some longer content that will probably have to be cut at some point, because it just wont fit but such is life, what can you do? nothing. i mean i guess you could scroll? but that would look ugly",
-      href: "/",
-    },
-    { title: "Title", content: "Content", href: "/" },
-  ]),
-  noResults = "No results found",
-  value = $bindable(""),
-  icon,
-  children,
-}: {
-  showResults?: boolean;
-  placeholder?: string;
-  results?: SearchResult[];
-  noResults?: string;
-  value?: string;
-  icon?: Snippet;
-  children?: Snippet;
-} = $props();
+  let {
+    showResults = $bindable(true),
+    placeholder = "Search...",
+    results = $bindable([
+      {
+        title: "Title",
+        content:
+          "This is some longer content that will probably have to be cut at some point, because it just wont fit but such is life, what can you do? nothing. i mean i guess you could scroll? but that would look ugly",
+        href: "/",
+      },
+      { title: "Title", content: "Content", href: "/" },
+    ]),
+    noResults = "No results found",
+    value = $bindable(""),
+    icon,
+    children,
+  }: {
+    showResults?: boolean;
+    placeholder?: string;
+    results?: SearchResult[];
+    noResults?: string;
+    value?: string;
+    icon?: Snippet;
+    children?: Snippet;
+  } = $props();
 
-let currentSelection = $state(0);
+  let currentSelection = $state(0);
 
-let pagefind: Pagefind | undefined;
-let input = $state<HTMLInputElement | undefined>(undefined);
+  let pagefind: Pagefind | undefined;
+  let input = $state<HTMLInputElement | undefined>(undefined);
 
-const search = async () => {
-  if (!pagefind || value.trim() === "") return;
+  const search = async () => {
+    if (!pagefind || value.trim() === "") return;
 
-  const pagefindResults = (await pagefind.debouncedSearch(value)).results;
+    const pagefindResults = (await pagefind.debouncedSearch(value)).results;
 
-  showResults = true;
-  results = [];
-
-  const newResults: SearchResult[] = [];
-
-  for (let i = 0; i < pagefindResults.length && i < 5; i++) {
-    const result = await pagefindResults[i].data();
-
-    let excerpt = result.excerpt;
-    // replace <mark> tags with <span class="bg-pink-600/10">
-    excerpt = excerpt.replaceAll(
-      "<mark>",
-      '<span class="bg-accent-500/20 rounded-md p-0.5">',
-    );
-    excerpt = excerpt.replaceAll("</mark>", "</span>");
-
-    newResults[i] = {
-      title: result.meta.title,
-      content: excerpt,
-      href: result.url,
-    };
-  }
-
-  results = Object.values(newResults);
-};
-
-export const show = () => {
-  $showSearch = true;
-  setTimeout(() => input?.focus(), 200);
-};
-
-async function setupSearch() {
-  try {
-    // @ts-ignore
-    pagefind = await import(/* @vite-ignore */ BASE + "/pagefind/pagefind.js");
-    // If there is already a query before pagefind is even loaded, search immediately.
-    if (value.trim() !== "") await search();
-  } catch (error) {
-    console.error("Pagefind module not found, will retry after build");
-  }
-}
-
-setupSearch();
-
-$effect(() => {
-  if (value.trim() === "") {
+    showResults = true;
     results = [];
-    showResults = false;
-    return;
-  }
 
-  search();
-});
+    const newResults: SearchResult[] = [];
 
-$effect(() => {
-  if ($showSearch) {
-    currentSelection = 0;
+    for (let i = 0; i < pagefindResults.length && i < 5; i++) {
+      const result = await pagefindResults[i].data();
+
+      let excerpt = result.excerpt;
+      // replace <mark> tags with <span class="bg-pink-600/10">
+      excerpt = excerpt.replaceAll(
+        "<mark>",
+        '<span class="bg-accent-500/20 rounded-md p-0.5">',
+      );
+      excerpt = excerpt.replaceAll("</mark>", "</span>");
+
+      newResults[i] = {
+        title: result.meta.title,
+        content: excerpt,
+        href: result.url,
+      };
+    }
+
+    results = Object.values(newResults);
+  };
+
+  export const show = () => {
+    $showSearch = true;
     setTimeout(() => input?.focus(), 200);
-    return;
+  };
+
+  async function setupSearch() {
+    try {
+      // @ts-ignore
+      pagefind = await import(
+        /* @vite-ignore */ BASE + "/pagefind/pagefind.js"
+      );
+      // If there is already a query before pagefind is even loaded, search immediately.
+      if (value.trim() !== "") await search();
+    } catch (error) {
+      console.error("Pagefind module not found, will retry after build");
+    }
   }
 
-  value = "";
-});
+  setupSearch();
+
+  $effect(() => {
+    if (value.trim() === "") {
+      results = [];
+      showResults = false;
+      return;
+    }
+
+    search();
+  });
+
+  $effect(() => {
+    if ($showSearch) {
+      currentSelection = 0;
+      setTimeout(() => input?.focus(), 200);
+      return;
+    }
+
+    value = "";
+  });
 </script>
 
 <svelte:window
