@@ -1,5 +1,5 @@
 <script lang="ts">
-import { showSearch } from "./CommandPaletteStore";
+  import { showSearch } from "./CommandPaletteStore";
 </script>
 
 <button
@@ -24,7 +24,6 @@ import { showSearch } from "./CommandPaletteStore";
     />
   </svg>
 </button>
-
 
 <noscript>
   <style>
