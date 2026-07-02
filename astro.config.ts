@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import { unified } from "@astrojs/markdown-remark";
 import { resolve } from "path";
 import remarkMath from "remark-math";
 import rehypeMathjax from "rehype-mathjax";
@@ -73,11 +74,13 @@ export default defineConfig({
       wrap: true,
     },
 
-    remarkPlugins: [remarkMath],
-    rehypePlugins: [rehypeMathjax],
-    remarkRehype: {
-      footnoteBackContent: "↩︎",
-    },
+    processor: unified({
+      remarkPlugins: [remarkMath],
+      rehypePlugins: [rehypeMathjax],
+      remarkRehype: {
+        footnoteBackContent: "↩︎",
+      },
+    }),
   },
 
   prefetch: {
