@@ -25,7 +25,7 @@ export const SITE_FAVICON = "🔷";
 export const NAME = "rami3l";
 
 // will be used in the footer as the license of the content (e.g. "All rights reserved" or "CC-BY-SA 4.0")
-export const LICENSE = "All rights reserved.";
+export const LICENSE = "Licensed under CC-BY-SA 4.0";
 
 export const SOURCE_LINK = "https://github.com/rami3l/rami3l.github.io";
 
