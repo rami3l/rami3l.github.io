@@ -78,7 +78,7 @@ export default defineConfig({
       remarkPlugins: [remarkMath],
       rehypePlugins: [rehypeMathjax],
       remarkRehype: {
-        footnoteBackContent: "↩︎",
+        footnoteBackContent: "⏎",
       },
     }),
   },
