@@ -193,7 +193,7 @@ few main improvements:
 
 - It has a more gradual rollout plan, which feels way more realistic in terms of
   actually implementing the new semantics into rustup's existing codebase.
-  [`@cachebag`] and I have individually came up with the idea of adapting the
+  [`@cachebag`] and I have individually come up with the idea of adapting the
   [A/B partitioning scheme] for the transitional period (see the section on
   [community building](#community-building) for more about our collaboration on
   the topic).
