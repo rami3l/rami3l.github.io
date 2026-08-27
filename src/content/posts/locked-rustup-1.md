@@ -9,7 +9,7 @@ tags = ["Rust", "rustup", "toolchain", "concurrency", "lock"]
 > [...] alas! either the locks were too large, or the key was too small, but at
 > any rate it would not open any of them.
 >
-> -- Lewis Carroll, _Alice's Adventures in Wonderland_
+> – Lewis Carroll, _Alice's Adventures in Wonderland_
 
 ## The Long-Standing Issue
 
