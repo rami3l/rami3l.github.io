@@ -176,6 +176,7 @@ RustChinaConf 2026 to talk specifically about rustup! Looking forward to meeting
 some of you offline in Shenzhen next month :)
 
 [platform directories support]: https://github.com/rust-lang/rustup/issues/247
+[`@djc`]: https://github.com/djc
 [`@Cloud0310`]: https://github.com/Cloud0310
 
 ## Conclusion
