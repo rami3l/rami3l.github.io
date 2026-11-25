@@ -80,7 +80,7 @@ bandwidth gap between the production of issues/PRs and their review.
 I don't currently have a strategy dealing with this situation yet, but I see
 this as a case that may be generalized to other places, and for a project like
 rustup where the overall bandwidth of the maintainers has just floated above the
-acceptable threshold, a possible alarming signal. [^contact]
+acceptable threshold, a possible alarming signal.[^contact]
 
 [^contact]:
     If you have any suggestions or experiences to share in this regard, please
