@@ -29,15 +29,15 @@
     "rehype-mathjax": "^7.1.0",
     "remark-math": "^6.0.0",
     "sharp": "^0.35.5",
-    "svelte": "^5.58.0",
-    "tailwind-merge": "^3.7.0",
+    "svelte": "^5.59.1",
+    "tailwind-merge": "^3.7.1",
     "tailwindcss": "^4.3.5",
     "typescript": "^6.0.3"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.5",
-    "oxfmt": "^0.78.0",
+    "oxfmt": "^0.79.0",
     "pagefind": "^1.6.0",
     "vite-plugin-pagefind": "^1.1.2"
   }
